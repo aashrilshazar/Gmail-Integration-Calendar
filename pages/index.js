@@ -6,6 +6,8 @@ const ACCOUNTS = [
   "r.parikh@keye.co",
   "rparikh@keye.co",
   "rohan@keye.co",
+  "rohan.parikh@keye.co",
+  "rohanparikh@keye.co",
 ];
 
 const ACCOUNT_COLORS = {
@@ -13,9 +15,11 @@ const ACCOUNT_COLORS = {
   "r.parikh@keye.co": 1,
   "rparikh@keye.co": 2,
   "rohan@keye.co": 3,
+  "rohan.parikh@keye.co": 4,
+  "rohanparikh@keye.co": 5,
 };
 
-const ACCOUNT_HEX = ["#039be5", "#7986cb", "#33b679", "#e67c73"];
+const ACCOUNT_HEX = ["#039be5", "#7986cb", "#33b679", "#e67c73", "#f6bf26", "#8e24aa"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 52; // px per hour, matches reference repo
 
