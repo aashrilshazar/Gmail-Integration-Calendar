@@ -151,7 +151,7 @@ ${emailContext || "No emails found."}
 MEETINGS:
 ${meetingContext || "No meetings found."}
 
-Respond with exactly 3 to 5 bullet points, ordered from the most recent update to the earliest. Each bullet should be one concise sentence. Do not use markdown formatting — just start each line with a dash and a space like "- Update here". Be direct and actionable. Cover: deal status, key contacts, and next steps.`;
+Respond with exactly 3 to 5 bullet points, ordered from the most recent update to the earliest. Each bullet must be a single factual statement — no narrative, no opinions, no filler words. State only what happened, who was involved, and what was decided. Start each line with "- " (dash space). Do not use markdown formatting.`;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

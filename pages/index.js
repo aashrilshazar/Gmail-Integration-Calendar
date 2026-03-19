@@ -176,37 +176,50 @@ export default function Home() {
     });
   }
 
-  // Layout overlapping events into columns
+  // Layout overlapping events into columns, expanding to fill free space
   function layoutEvents(dayEvents) {
+    if (dayEvents.length === 0) return [];
     const items = dayEvents.map(e => {
       const s = new Date(e.start);
       const en = new Date(e.end);
       return { event: e, startH: s.getHours() + s.getMinutes() / 60, endH: en.getHours() + en.getMinutes() / 60 };
     }).sort((a, b) => a.startH - b.startH || a.endH - b.endH);
 
+    // Assign each event to a column
     const columns = [];
+    const itemCol = new Map();
     for (const item of items) {
       let placed = false;
       for (let c = 0; c < columns.length; c++) {
         if (columns[c].at(-1).endH <= item.startH) {
           columns[c].push(item);
+          itemCol.set(item, c);
           placed = true;
           break;
         }
       }
-      if (!placed) columns.push([item]);
+      if (!placed) {
+        itemCol.set(item, columns.length);
+        columns.push([item]);
+      }
     }
 
     const totalCols = columns.length;
-    return columns.flatMap((col, ci) =>
-      col.map(item => {
-        const top = (item.startH - 7) * 60;
-        const height = Math.max((item.endH - item.startH) * 60, 20);
-        const width = `calc(${100 / totalCols}% - 2px)`;
-        const left = `calc(${(ci / totalCols) * 100}% + 1px)`;
-        return { event: item.event, style: { top: `${top}px`, height: `${height}px`, width, left } };
-      })
-    );
+    return items.map(item => {
+      const col = itemCol.get(item);
+      // Expand right into free adjacent columns
+      let span = col + 1;
+      for (let c = col + 1; c < totalCols; c++) {
+        const conflict = columns[c].some(o => o.startH < item.endH && o.endH > item.startH);
+        if (conflict) break;
+        span = c + 1;
+      }
+      const top = (item.startH - 7) * 60;
+      const height = Math.max((item.endH - item.startH) * 60, 20);
+      const left = `calc(${(col / totalCols) * 100}% + 1px)`;
+      const width = `calc(${((span - col) / totalCols) * 100}% - 2px)`;
+      return { event: item.event, style: { top: `${top}px`, height: `${height}px`, width, left } };
+    });
   }
 
   return (
