@@ -105,8 +105,11 @@ export default async function handler(req, res) {
     // Sort newest first
     emails.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // 2. Search Notion for meeting transcripts
-    const meetings = await searchMeetings(searchTerm);
+    // 2. Search Notion for meeting transcripts (skip if DB not configured)
+    let meetings = [];
+    if (process.env.NOTION_TOKEN && process.env.NOTION_DATABASE_ID) {
+      meetings = await searchMeetings(searchTerm);
+    }
 
     // 3. Build people list from emails + attendees
     const peopleSet = new Set();
@@ -124,6 +127,8 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error("Claude summary error:", err.message);
       }
+    } else {
+      console.error("ANTHROPIC_API_KEY is not set — skipping AI summary");
     }
 
     const result = { company: searchTerm, summary, emails: emails.slice(0, 20), meetings, people };

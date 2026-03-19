@@ -74,11 +74,24 @@ function getNYCHour() {
 }
 
 function guessCompany(title) {
-  // For "Keye <> Insight Partners" style titles, extract the non-Keye side
   if (title.includes("<>")) {
     const parts = title.split("<>").map(p => p.trim());
-    const other = parts.find(p => !/^keye/i.test(p));
-    if (other) return other;
+
+    // Strip common prefixes/wrappers from each part
+    const strip = s => s
+      .replace(/^\[.*?\]\s*~?\s*/g, "")
+      .replace(/^(ZOOM|Call|Connect|Meeting)\s*[\|\/]+\s*/i, "")
+      .trim();
+
+    // Identify the Keye side: contains "keye" or is a known Keye employee first name
+    const isKeye = p => /keye/i.test(p) ||
+      /^(rohan|dani|conor|morgan|anthony|lalit|aashril|ryan|r\.?\s*parikh|rparikh)/i.test(strip(p));
+
+    const other = parts.find(p => !isKeye(p));
+    if (other) return strip(other) || other;
+
+    // Both sides look like Keye — return the second part stripped
+    return strip(parts[1]) || parts[1];
   }
   let clean = title
     .replace(/^(meeting|call|sync|demo|intro|check-in|standup|1:1)\s*(with|:|-|–)?\s*/i, "")
@@ -201,7 +214,7 @@ export default function Home() {
     setWeekLoading(false);
   };
 
-  // Pre-fetch event details only for "<>" events (2 concurrent to avoid overwhelming API)
+  // Pre-fetch event details sequentially for "<>" events (1 at a time, 2s delay to avoid rate limits)
   useEffect(() => {
     if (allEvents.length === 0) return;
     const queue = [];
@@ -216,10 +229,8 @@ export default function Home() {
         queue.push({ key, company, title: event.title, emails });
       }
     });
-    let idx = 0;
-    async function fetchNext() {
-      while (idx < queue.length) {
-        const { key, company, title, emails } = queue[idx++];
+    async function fetchAll() {
+      for (const { key, company, title, emails } of queue) {
         fetchedDetails.current.add(key);
         try {
           const res = await fetch(`/api/event/detail?company=${encodeURIComponent(company)}&eventTitle=${encodeURIComponent(title)}&attendees=${encodeURIComponent(emails)}`);
@@ -230,9 +241,11 @@ export default function Home() {
         } catch (err) {
           console.error(`Detail fetch failed for ${key}:`, err);
         }
+        // 2s delay between requests to avoid Claude rate limits
+        await new Promise(r => setTimeout(r, 2000));
       }
     }
-    fetchNext(); fetchNext();
+    fetchAll();
   }, [allEvents]);
 
   // Filter events to current week
