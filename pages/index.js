@@ -59,6 +59,16 @@ function formatMonthYear(monday) {
   return `${monday.toLocaleDateString("en-US", { month: "short" })} – ${sunday.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
 }
 
+// Always use NYC time
+function getNYCNow() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
+}
+
+function getNYCHour() {
+  const nyc = getNYCNow();
+  return nyc.getHours() + nyc.getMinutes() / 60;
+}
+
 function guessCompany(title) {
   let clean = title
     .replace(/^(meeting|call|sync|demo|intro|check-in|standup|1:1)\s*(with|:|-|–)?\s*/i, "")
@@ -214,20 +224,13 @@ export default function Home() {
   const goToday = () => setWeekStart(getSunday(new Date()));
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const today = new Date();
-  const todayStr = today.toDateString();
+  const todayStr = getNYCNow().toDateString();
 
-  // Current time indicator
-  // Force EST for current time indicator
-  function getESTHour() {
-    const now = new Date();
-    const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
-    return est.getHours() + est.getMinutes() / 60;
-  }
-  const [nowHour, setNowHour] = useState(() => typeof window !== "undefined" ? getESTHour() : 12);
+  // Current time indicator (NYC time)
+  const [nowHour, setNowHour] = useState(12);
   useEffect(() => {
-    setNowHour(getESTHour());
-    const timer = setInterval(() => setNowHour(getESTHour()), 60000);
+    setNowHour(getNYCHour());
+    const timer = setInterval(() => setNowHour(getNYCHour()), 60000);
     return () => clearInterval(timer);
   }, []);
   const nowTop = nowHour * HOUR_HEIGHT;
