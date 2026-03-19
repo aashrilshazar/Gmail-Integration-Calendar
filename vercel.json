@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "pages/api/event/detail.js": {
+      "maxDuration": 60
+    }
+  }
+}

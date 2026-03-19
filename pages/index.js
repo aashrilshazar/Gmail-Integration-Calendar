@@ -201,12 +201,13 @@ export default function Home() {
     setWeekLoading(false);
   };
 
-  // Pre-fetch event details (3 concurrent)
+  // Pre-fetch event details only for "<>" events (2 concurrent to avoid overwhelming API)
   useEffect(() => {
     if (allEvents.length === 0) return;
     const queue = [];
     const seen = new Set();
     allEvents.forEach(event => {
+      if (!event.title.includes("<>")) return;
       const company = guessCompany(event.title);
       const key = `${company}|${event.title}`;
       if (!seen.has(key) && !fetchedDetails.current.has(key)) {
@@ -222,12 +223,16 @@ export default function Home() {
         fetchedDetails.current.add(key);
         try {
           const res = await fetch(`/api/event/detail?company=${encodeURIComponent(company)}&eventTitle=${encodeURIComponent(title)}&attendees=${encodeURIComponent(emails)}`);
-          const data = await res.json();
-          setDetailCache(prev => ({ ...prev, [key]: data }));
-        } catch {}
+          if (res.ok) {
+            const data = await res.json();
+            setDetailCache(prev => ({ ...prev, [key]: data }));
+          }
+        } catch (err) {
+          console.error(`Detail fetch failed for ${key}:`, err);
+        }
       }
     }
-    fetchNext(); fetchNext(); fetchNext();
+    fetchNext(); fetchNext();
   }, [allEvents]);
 
   // Filter events to current week

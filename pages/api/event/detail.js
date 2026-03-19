@@ -33,49 +33,51 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Search Gmail across all accounts using all search terms
+    // 1. Search Gmail across all accounts (single OR query per account)
+    const gmailQuery = searchTerms.length > 1
+      ? searchTerms.map(t => `{${t}}`).join(" OR ")
+      : searchTerms[0];
+
     const emailResults = await Promise.all(
-      ACCOUNTS.flatMap((email) =>
-        searchTerms.map(async (term) => {
-          try {
-            const gmail = getGmailClient(email);
-            const searchRes = await gmail.users.messages.list({
-              userId: "me",
-              q: term,
-              maxResults: 10,
-            });
+      ACCOUNTS.map(async (email) => {
+        try {
+          const gmail = getGmailClient(email);
+          const searchRes = await gmail.users.messages.list({
+            userId: "me",
+            q: gmailQuery,
+            maxResults: 8,
+          });
 
-            if (!searchRes.data.messages) return [];
+          if (!searchRes.data.messages) return [];
 
-            const messages = await Promise.all(
-              searchRes.data.messages.slice(0, 8).map(async (msg) => {
-                const full = await gmail.users.messages.get({
-                  userId: "me",
-                  id: msg.id,
-                  format: "metadata",
-                  metadataHeaders: ["From", "To", "Subject", "Date"],
-                });
-                const headers = full.data.payload?.headers || [];
-                const getHeader = (name) =>
-                  headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-                return {
-                  id: msg.id,
-                  account: email,
-                  from: getHeader("From"),
-                  to: getHeader("To"),
-                  subject: getHeader("Subject"),
-                  date: getHeader("Date"),
-                  snippet: full.data.snippet || "",
-                };
-              })
-            );
-            return messages;
-          } catch (err) {
-            console.error(`Gmail error for ${email}:`, err.message);
-            return [];
-          }
-        })
-      )
+          const messages = await Promise.all(
+            searchRes.data.messages.slice(0, 5).map(async (msg) => {
+              const full = await gmail.users.messages.get({
+                userId: "me",
+                id: msg.id,
+                format: "metadata",
+                metadataHeaders: ["From", "To", "Subject", "Date"],
+              });
+              const headers = full.data.payload?.headers || [];
+              const getHeader = (name) =>
+                headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+              return {
+                id: msg.id,
+                account: email,
+                from: getHeader("From"),
+                to: getHeader("To"),
+                subject: getHeader("Subject"),
+                date: getHeader("Date"),
+                snippet: full.data.snippet || "",
+              };
+            })
+          );
+          return messages;
+        } catch (err) {
+          console.error(`Gmail error for ${email}:`, err.message);
+          return [];
+        }
+      })
     );
 
     // Dedupe emails by subject + date
