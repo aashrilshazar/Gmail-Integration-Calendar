@@ -80,7 +80,15 @@ function guessCompany(title) {
 // Layout overlapping events into columns, expanding to fill free space
 function layoutEvents(dayEvents) {
   if (dayEvents.length === 0) return [];
-  const items = dayEvents.map(e => {
+  // Dedupe by title + start time
+  const seen = new Set();
+  const unique = dayEvents.filter(e => {
+    const key = `${e.title}|${e.start}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const items = unique.map(e => {
     const s = new Date(e.start);
     const en = new Date(e.end);
     return { event: e, startH: s.getHours() + s.getMinutes() / 60, endH: en.getHours() + en.getMinutes() / 60 };
