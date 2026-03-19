@@ -141,22 +141,29 @@ export default async function handler(req, res) {
 
 async function generateSummary(company, emails, meetings, eventTitle) {
   const emailContext = emails.slice(0, 8).map(e =>
-    `[${e.date}] ${e.subject} — ${e.snippet}`
+    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject} — ${e.snippet}`
   ).join("\n");
 
   const meetingContext = meetings.slice(0, 5).map(m =>
     `[${m.date}] ${m.name} — ${m.summary || "No summary"}`
   ).join("\n");
 
-  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${company}" based on the context below. Note: "${company}" may be a partial name — match liberally (e.g. "Insight" matches "Insight Partners", "Deutsche" matches "Deutsche Beteiligungsgesellschaft").
+  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${company}" based on the context below. The calendar event title is: "${eventTitle}". Note: "${company}" may be a partial name — match liberally (e.g. "Insight" matches "Insight Partners", "Deutsche" matches "Deutsche Beteiligungsgesellschaft").
 
-EMAILS:
+EMAILS (sorted newest to oldest):
 ${emailContext || "None."}
 
 MEETINGS:
 ${meetingContext || "None."}
 
-Respond with exactly 3 to 5 bullet points, ordered from the most recent update to the earliest. Each bullet must be a single factual statement — no narrative, no opinions, no filler words. State only what happened, who was involved, and what was decided. Start each line with "- " (dash space). Do not use markdown formatting. If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${company}."`;
+Respond with exactly 3 to 5 bullet points. Start each line with "- " (dash space). Do not use markdown formatting. Each bullet must be a single factual statement — no narrative, no opinions, no filler words.
+
+Bullet point order:
+1. First bullet: the latest update or action item — what is this upcoming call/meeting about?
+2. Second bullet: when and who the FIRST (earliest/oldest) correspondence was with. Include the client contact's name and ALL @keye.co email addresses involved in that first email interaction (e.g. "- First contact on Jan 5 2026 between John Smith (Insight Partners) and dani@keye.co, r.parikh@keye.co").
+3. Remaining bullets: other key factual updates in reverse chronological order.
+
+If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${company}."`;
 
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
