@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 
 const ACCOUNTS = [
@@ -47,13 +47,12 @@ function formatDate(isoString) {
   });
 }
 
-function formatWeekRange(monday) {
+function formatMonthYear(monday) {
   const sunday = addDays(monday, 6);
-  const opts = { month: "short", day: "numeric" };
-  const endOpts = monday.getMonth() === sunday.getMonth()
-    ? { day: "numeric", year: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric" };
-  return `${monday.toLocaleDateString("en-US", opts)} – ${sunday.toLocaleDateString("en-US", endOpts)}`;
+  if (monday.getMonth() === sunday.getMonth()) {
+    return monday.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  return `${monday.toLocaleDateString("en-US", { month: "short" })} – ${sunday.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
 }
 
 // Extract a "company name" guess from an event title
@@ -68,38 +67,77 @@ function guessCompany(title) {
 
 export default function Home() {
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [events, setEvents] = useState([]);
+  const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailCache, setDetailCache] = useState({});
+  const fetchedDetails = useRef(new Set());
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
-    const start = weekStart.toISOString();
-    const end = addDays(weekStart, 7).toISOString();
-    try {
-      const res = await fetch(`/api/calendar?start=${start}&end=${end}`);
-      const data = await res.json();
-      setEvents(data.events || []);
-    } catch (err) {
-      console.error("Failed to fetch events:", err);
-      setEvents([]);
+  // Pre-fetch calendar events: 1 week back, 3 weeks forward
+  useEffect(() => {
+    const thisMonday = getMonday(new Date());
+    const rangeStart = addDays(thisMonday, -7);
+    const rangeEnd = addDays(thisMonday, 28);
+    fetch(`/api/calendar?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}`)
+      .then(res => res.json())
+      .then(data => { setAllEvents(data.events || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  // Pre-fetch all event details in background (3 concurrent)
+  useEffect(() => {
+    if (allEvents.length === 0) return;
+    const queue = [];
+    const seen = new Set();
+    allEvents.forEach(event => {
+      const company = guessCompany(event.title);
+      const key = `${company}|${event.title}`;
+      if (!seen.has(key) && !fetchedDetails.current.has(key)) {
+        seen.add(key);
+        const emails = (event.attendees || []).map(a => a.email).join(",");
+        queue.push({ key, company, title: event.title, emails });
+      }
+    });
+    let idx = 0;
+    async function fetchNext() {
+      while (idx < queue.length) {
+        const { key, company, title, emails } = queue[idx++];
+        fetchedDetails.current.add(key);
+        try {
+          const res = await fetch(`/api/event/detail?company=${encodeURIComponent(company)}&eventTitle=${encodeURIComponent(title)}&attendees=${encodeURIComponent(emails)}`);
+          const data = await res.json();
+          setDetailCache(prev => ({ ...prev, [key]: data }));
+        } catch {}
+      }
     }
-    setLoading(false);
-  }, [weekStart]);
+    fetchNext(); fetchNext(); fetchNext(); // 3 concurrent workers
+  }, [allEvents]);
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  // Filter allEvents to current week for display
+  const events = allEvents.filter(e => {
+    const d = new Date(e.start);
+    return d >= weekStart && d < addDays(weekStart, 7);
+  });
 
   const openDetail = async (event) => {
     setSelectedEvent(event);
+    const company = guessCompany(event.title);
+    const key = `${company}|${event.title}`;
+    if (detailCache[key]) {
+      setDetail(detailCache[key]);
+      setDetailLoading(false);
+      return;
+    }
     setDetail(null);
     setDetailLoading(true);
-    const company = encodeURIComponent(guessCompany(event.title));
+    const attendees = (event.attendees || []).map(a => a.email).join(",");
     try {
-      const res = await fetch(`/api/event/detail?company=${company}&eventTitle=${encodeURIComponent(event.title)}`);
+      const res = await fetch(`/api/event/detail?company=${encodeURIComponent(company)}&eventTitle=${encodeURIComponent(event.title)}&attendees=${encodeURIComponent(attendees)}`);
       const data = await res.json();
       setDetail(data);
+      setDetailCache(prev => ({ ...prev, [key]: data }));
     } catch (err) {
       console.error("Failed to fetch detail:", err);
     }
@@ -129,17 +167,6 @@ export default function Home() {
   const nowHour = now.getHours() + now.getMinutes() / 60;
   const nowTop = (nowHour - 7) * 60;
 
-  // Position events on the grid
-  function getEventStyle(event) {
-    const start = new Date(event.start);
-    const end = new Date(event.end);
-    const startHour = start.getHours() + start.getMinutes() / 60;
-    const endHour = end.getHours() + end.getMinutes() / 60;
-    const top = (startHour - 7) * 60; // 60px per hour, offset by 7am
-    const height = Math.max((endHour - startHour) * 60, 20);
-    return { top: `${top}px`, height: `${height}px` };
-  }
-
   // Group events by day
   function eventsForDay(dayDate) {
     const dayStr = dayDate.toDateString();
@@ -147,6 +174,39 @@ export default function Home() {
       const eDate = new Date(e.start);
       return eDate.toDateString() === dayStr;
     });
+  }
+
+  // Layout overlapping events into columns
+  function layoutEvents(dayEvents) {
+    const items = dayEvents.map(e => {
+      const s = new Date(e.start);
+      const en = new Date(e.end);
+      return { event: e, startH: s.getHours() + s.getMinutes() / 60, endH: en.getHours() + en.getMinutes() / 60 };
+    }).sort((a, b) => a.startH - b.startH || a.endH - b.endH);
+
+    const columns = [];
+    for (const item of items) {
+      let placed = false;
+      for (let c = 0; c < columns.length; c++) {
+        if (columns[c].at(-1).endH <= item.startH) {
+          columns[c].push(item);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) columns.push([item]);
+    }
+
+    const totalCols = columns.length;
+    return columns.flatMap((col, ci) =>
+      col.map(item => {
+        const top = (item.startH - 7) * 60;
+        const height = Math.max((item.endH - item.startH) * 60, 20);
+        const width = `calc(${100 / totalCols}% - 2px)`;
+        const left = `calc(${(ci / totalCols) * 100}% + 1px)`;
+        return { event: item.event, style: { top: `${top}px`, height: `${height}px`, width, left } };
+      })
+    );
   }
 
   return (
@@ -157,27 +217,29 @@ export default function Home() {
 
       {/* HEADER */}
       <div className="header">
-        <h1>Keyesight <span>/ calendar</span></h1>
-        <div className="nav-buttons">
-          <button onClick={prevWeek}>← Prev</button>
-          <button onClick={goToday}>Today</button>
-          <span className="week-label">{formatWeekRange(weekStart)}</span>
-          <button onClick={nextWeek}>Next →</button>
+        <div className="header-left">
+          <h1>Keyesight</h1>
+          <button className="today-btn" onClick={goToday}>Today</button>
+          <button className="nav-arrow" onClick={prevWeek}>&#8249;</button>
+          <button className="nav-arrow" onClick={nextWeek}>&#8250;</button>
+          <span className="month-label">{formatMonthYear(weekStart)}</span>
         </div>
-        <div className="legend">
-          {ACCOUNTS.map((acc, i) => (
-            <div key={acc} className="legend-item">
-              <div className="legend-dot" style={{ background: `var(--accent-${i + 1})` }} />
-              {acc.split("@")[0]}
-            </div>
-          ))}
+        <div className="header-right">
+          <div className="legend">
+            {ACCOUNTS.map((acc, i) => (
+              <div key={acc} className="legend-item">
+                <div className="legend-dot" style={{ background: `var(--accent-${i + 1})` }} />
+                {acc.split("@")[0]}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* CALENDAR */}
       <div className="calendar-container">
         <div className="time-column">
-          <div style={{ height: 48 }} />
+          <div style={{ height: 60 }} />
           {HOURS.map(h => (
             <div key={h} className="time-label">
               {h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
@@ -198,11 +260,11 @@ export default function Home() {
                 {day.toDateString() === todayStr && nowHour >= 7 && nowHour <= 21 && (
                   <div className="now-line" style={{ top: `${nowTop}px` }} />
                 )}
-                {!loading && eventsForDay(day).map((event, ei) => (
+                {!loading && layoutEvents(eventsForDay(day)).map(({ event, style }, ei) => (
                   <div
                     key={`${event.id}-${ei}`}
                     className={`event-tile account-${ACCOUNT_COLORS[event.account] ?? 0}`}
-                    style={getEventStyle(event)}
+                    style={style}
                     onClick={() => openDetail(event)}
                   >
                     <div className="event-time">{formatTime(event.start)}</div>
@@ -251,7 +313,11 @@ export default function Home() {
                 {detail.summary && (
                   <div className="detail-section">
                     <h3>AI Summary</h3>
-                    <div className="summary-text">{detail.summary}</div>
+                    <ul className="summary-list">
+                      {detail.summary.split("\n").filter(l => l.trim().replace(/^-\s*/, "")).map((line, i) => (
+                        <li key={i}>{line.trim().replace(/^-\s*/, "")}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
