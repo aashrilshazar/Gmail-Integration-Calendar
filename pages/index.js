@@ -74,6 +74,12 @@ function getNYCHour() {
 }
 
 function guessCompany(title) {
+  // For "Keye <> Insight Partners" style titles, extract the non-Keye side
+  if (title.includes("<>")) {
+    const parts = title.split("<>").map(p => p.trim());
+    const other = parts.find(p => !/^keye/i.test(p));
+    if (other) return other;
+  }
   let clean = title
     .replace(/^(meeting|call|sync|demo|intro|check-in|standup|1:1)\s*(with|:|-|–)?\s*/i, "")
     .replace(/\s*(meeting|call|sync|demo|intro|check-in)$/i, "")

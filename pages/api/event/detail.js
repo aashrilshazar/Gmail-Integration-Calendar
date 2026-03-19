@@ -16,6 +16,9 @@ export default async function handler(req, res) {
   }
 
   const searchTerm = company || eventTitle;
+  // Also search by full event title if different from company name
+  const searchTerms = [searchTerm];
+  if (eventTitle && eventTitle !== searchTerm) searchTerms.push(eventTitle);
   const attendeeEmails = attendeesParam ? attendeesParam.split(",").map(e => e.trim().toLowerCase()) : [];
 
   // Check cache
@@ -30,47 +33,49 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Search Gmail across all accounts
+    // 1. Search Gmail across all accounts using all search terms
     const emailResults = await Promise.all(
-      ACCOUNTS.map(async (email) => {
-        try {
-          const gmail = getGmailClient(email);
-          const searchRes = await gmail.users.messages.list({
-            userId: "me",
-            q: searchTerm,
-            maxResults: 15,
-          });
+      ACCOUNTS.flatMap((email) =>
+        searchTerms.map(async (term) => {
+          try {
+            const gmail = getGmailClient(email);
+            const searchRes = await gmail.users.messages.list({
+              userId: "me",
+              q: term,
+              maxResults: 10,
+            });
 
-          if (!searchRes.data.messages) return [];
+            if (!searchRes.data.messages) return [];
 
-          const messages = await Promise.all(
-            searchRes.data.messages.slice(0, 10).map(async (msg) => {
-              const full = await gmail.users.messages.get({
-                userId: "me",
-                id: msg.id,
-                format: "metadata",
-                metadataHeaders: ["From", "To", "Subject", "Date"],
-              });
-              const headers = full.data.payload?.headers || [];
-              const getHeader = (name) =>
-                headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-              return {
-                id: msg.id,
-                account: email,
-                from: getHeader("From"),
-                to: getHeader("To"),
-                subject: getHeader("Subject"),
-                date: getHeader("Date"),
-                snippet: full.data.snippet || "",
-              };
-            })
-          );
-          return messages;
-        } catch (err) {
-          console.error(`Gmail error for ${email}:`, err.message);
-          return [];
-        }
-      })
+            const messages = await Promise.all(
+              searchRes.data.messages.slice(0, 8).map(async (msg) => {
+                const full = await gmail.users.messages.get({
+                  userId: "me",
+                  id: msg.id,
+                  format: "metadata",
+                  metadataHeaders: ["From", "To", "Subject", "Date"],
+                });
+                const headers = full.data.payload?.headers || [];
+                const getHeader = (name) =>
+                  headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+                return {
+                  id: msg.id,
+                  account: email,
+                  from: getHeader("From"),
+                  to: getHeader("To"),
+                  subject: getHeader("Subject"),
+                  date: getHeader("Date"),
+                  snippet: full.data.snippet || "",
+                };
+              })
+            );
+            return messages;
+          } catch (err) {
+            console.error(`Gmail error for ${email}:`, err.message);
+            return [];
+          }
+        })
+      )
     );
 
     // Dedupe emails by subject + date
@@ -113,7 +118,7 @@ export default async function handler(req, res) {
     let summary = null;
     if (process.env.ANTHROPIC_API_KEY) {
       try {
-        summary = await generateSummary(searchTerm, emails, meetings);
+        summary = await generateSummary(searchTerm, emails, meetings, eventTitle);
       } catch (err) {
         console.error("Claude summary error:", err.message);
       }
@@ -134,7 +139,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function generateSummary(company, emails, meetings) {
+async function generateSummary(company, emails, meetings, eventTitle) {
   const emailContext = emails.slice(0, 8).map(e =>
     `[${e.date}] ${e.subject} — ${e.snippet}`
   ).join("\n");
@@ -143,15 +148,16 @@ async function generateSummary(company, emails, meetings) {
     `[${m.date}] ${m.name} — ${m.summary || "No summary"}`
   ).join("\n");
 
-  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${company}" based on:
+  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${company}" based on the context below. Note: "${company}" may be a partial name — match liberally (e.g. "Insight" matches "Insight Partners", "Deutsche" matches "Deutsche Beteiligungsgesellschaft").
 
 EMAILS:
-${emailContext || "No emails found."}
+${emailContext || "None."}
 
 MEETINGS:
-${meetingContext || "No meetings found."}
+${meetingContext || "None."}
 
-Respond with exactly 3 to 5 bullet points, ordered from the most recent update to the earliest. Each bullet must be a single factual statement — no narrative, no opinions, no filler words. State only what happened, who was involved, and what was decided. Start each line with "- " (dash space). Do not use markdown formatting.`;
+Respond with exactly 3 to 5 bullet points, ordered from the most recent update to the earliest. Each bullet must be a single factual statement — no narrative, no opinions, no filler words. State only what happened, who was involved, and what was decided. Start each line with "- " (dash space). Do not use markdown formatting. If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${company}."`;
+
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
