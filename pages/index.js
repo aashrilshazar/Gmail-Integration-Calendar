@@ -339,18 +339,18 @@ export default function Home() {
             </div>
 
             {/* Day columns */}
-            <div className="cal-day-columns" style={{ position: "relative" }}>
-              {/* Current time indicator across all columns */}
-              {days.some(d => d.toDateString() === todayStr) && (
-                <div className="cal-now-line" style={{ top: `${nowTop}px` }} />
-              )}
-
+            <div className="cal-day-columns">
               {days.map((day, di) => (
                 <div key={di} className="cal-day-col">
                   {/* Hour grid lines */}
                   {HOURS.map(h => (
                     <div key={h} className="cal-hour-line" style={{ height: HOUR_HEIGHT }} />
                   ))}
+
+                  {/* Current time indicator */}
+                  {day.toDateString() === todayStr && (
+                    <div className="cal-now-line" style={{ top: `${nowTop}px` }} />
+                  )}
 
                   {/* Events */}
                   {!loading && layoutEvents(eventsForDay(day)).map(({ event, style }, ei) => (
