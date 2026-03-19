@@ -288,13 +288,13 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Keyesight — Calendar</title>
+        <title>Keye Calendar</title>
       </Head>
 
       {/* HEADER */}
       <div className="cal-header">
         <div className="cal-header__left">
-          <h1 className="cal-header__title">Keyesight</h1>
+          <h1 className="cal-header__title">Keye Calendar</h1>
           <button className="cal-btn cal-btn--outlined" onClick={goToday}>Today</button>
           <button className="cal-btn cal-btn--icon" onClick={prevWeek}>&#8249;</button>
           <button className="cal-btn cal-btn--icon" onClick={nextWeek}>&#8250;</button>
