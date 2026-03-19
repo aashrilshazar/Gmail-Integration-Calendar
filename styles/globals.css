@@ -155,6 +155,16 @@ body {
   border-bottom: 1px solid var(--hour-line);
 }
 
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ef4444;
+  z-index: 6;
+  pointer-events: none;
+}
+
 /* EVENT TILES */
 .event-tile {
   position: absolute;

@@ -120,6 +120,15 @@ export default function Home() {
   const today = new Date();
   const todayStr = today.toDateString();
 
+  // Current time indicator
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const nowHour = now.getHours() + now.getMinutes() / 60;
+  const nowTop = (nowHour - 7) * 60;
+
   // Position events on the grid
   function getEventStyle(event) {
     const start = new Date(event.start);
@@ -186,6 +195,9 @@ export default function Home() {
                 {HOURS.map(h => (
                   <div key={h} className="hour-line" />
                 ))}
+                {day.toDateString() === todayStr && nowHour >= 7 && nowHour <= 21 && (
+                  <div className="now-line" style={{ top: `${nowTop}px` }} />
+                )}
                 {!loading && eventsForDay(day).map((event, ei) => (
                   <div
                     key={`${event.id}-${ei}`}
