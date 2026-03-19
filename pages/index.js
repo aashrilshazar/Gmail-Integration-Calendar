@@ -132,17 +132,24 @@ export default function Home() {
   const fetchedDetails = useRef(new Set());
   const gridRef = useRef(null);
 
-  // Pre-fetch calendar events: 1 week back, 3 weeks forward
+  // Pre-fetch calendar events: last week, this week, next week only
   useEffect(() => {
-    const thisMonday = getSunday(new Date());
-    const rangeStart = addDays(thisMonday, -7);
-    const rangeEnd = addDays(thisMonday, 28);
+    const thisSunday = getSunday(new Date());
+    const rangeStart = addDays(thisSunday, -7);
+    const rangeEnd = addDays(thisSunday, 21);
     fetch(`/api/calendar?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}`)
       .then(res => res.json())
       .then(data => {
-        setAllEvents(data.events || []);
+        // Only keep events within the 3-week window
+        const start = rangeStart.getTime();
+        const end = rangeEnd.getTime();
+        const filtered = (data.events || []).filter(e => {
+          const t = new Date(e.start).getTime();
+          return t >= start && t < end;
+        });
+        setAllEvents(filtered);
         const weeks = new Set();
-        for (let i = -1; i <= 3; i++) weeks.add(addDays(thisMonday, i * 7).toISOString());
+        for (let i = -1; i <= 1; i++) weeks.add(addDays(thisSunday, i * 7).toISOString());
         setFetchedWeeks(weeks);
         setLoading(false);
       })
