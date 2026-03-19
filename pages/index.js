@@ -19,11 +19,10 @@ const ACCOUNT_HEX = ["#039be5", "#7986cb", "#33b679", "#e67c73"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 52; // px per hour, matches reference repo
 
-function getMonday(d) {
+function getSunday(d) {
   const date = new Date(d);
   const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
+  date.setDate(date.getDate() - day);
   date.setHours(0, 0, 0, 0);
   return date;
 }
@@ -121,7 +120,7 @@ function layoutEvents(dayEvents) {
 }
 
 export default function Home() {
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [weekStart, setWeekStart] = useState(() => getSunday(new Date()));
   const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -135,7 +134,7 @@ export default function Home() {
 
   // Pre-fetch calendar events: 1 week back, 3 weeks forward
   useEffect(() => {
-    const thisMonday = getMonday(new Date());
+    const thisMonday = getSunday(new Date());
     const rangeStart = addDays(thisMonday, -7);
     const rangeEnd = addDays(thisMonday, 28);
     fetch(`/api/calendar?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}`)
@@ -205,19 +204,25 @@ export default function Home() {
   // Navigation
   const prevWeek = () => setWeekStart(addDays(weekStart, -7));
   const nextWeek = () => setWeekStart(addDays(weekStart, 7));
-  const goToday = () => setWeekStart(getMonday(new Date()));
+  const goToday = () => setWeekStart(getSunday(new Date()));
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const today = new Date();
   const todayStr = today.toDateString();
 
   // Current time indicator
-  const [now, setNow] = useState(new Date());
+  // Force EST for current time indicator
+  function getESTHour() {
+    const now = new Date();
+    const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+    return est.getHours() + est.getMinutes() / 60;
+  }
+  const [nowHour, setNowHour] = useState(() => typeof window !== "undefined" ? getESTHour() : 12);
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
+    setNowHour(getESTHour());
+    const timer = setInterval(() => setNowHour(getESTHour()), 60000);
     return () => clearInterval(timer);
   }, []);
-  const nowHour = now.getHours() + now.getMinutes() / 60;
   const nowTop = nowHour * HOUR_HEIGHT;
 
   // Scroll to ~8am on mount
@@ -327,18 +332,18 @@ export default function Home() {
             </div>
 
             {/* Day columns */}
-            <div className="cal-day-columns">
+            <div className="cal-day-columns" style={{ position: "relative" }}>
+              {/* Current time indicator across all columns */}
+              {days.some(d => d.toDateString() === todayStr) && (
+                <div className="cal-now-line" style={{ top: `${nowTop}px` }} />
+              )}
+
               {days.map((day, di) => (
                 <div key={di} className="cal-day-col">
                   {/* Hour grid lines */}
                   {HOURS.map(h => (
                     <div key={h} className="cal-hour-line" style={{ height: HOUR_HEIGHT }} />
                   ))}
-
-                  {/* Current time indicator */}
-                  {day.toDateString() === todayStr && (
-                    <div className="cal-now-line" style={{ top: `${nowTop}px` }} />
-                  )}
 
                   {/* Events */}
                   {!loading && layoutEvents(eventsForDay(day)).map(({ event, style }, ei) => (

@@ -269,12 +269,16 @@ body {
 .cal-now-line::before {
   content: '';
   position: absolute;
-  left: -5px;
+  left: 0;
   top: -4px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: #ea4335;
+}
+
+.cal-day-columns {
+  position: relative;
 }
 
 /* ===== EVENT SLOTS ===== */
