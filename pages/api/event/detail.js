@@ -33,51 +33,49 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Search Gmail across all accounts (single OR query per account)
-    const gmailQuery = searchTerms.length > 1
-      ? searchTerms.map(t => `{${t}}`).join(" OR ")
-      : searchTerms[0];
-
+    // 1. Search Gmail across all accounts using all search terms
     const emailResults = await Promise.all(
-      ACCOUNTS.map(async (email) => {
-        try {
-          const gmail = getGmailClient(email);
-          const searchRes = await gmail.users.messages.list({
-            userId: "me",
-            q: gmailQuery,
-            maxResults: 8,
-          });
+      ACCOUNTS.flatMap((email) =>
+        searchTerms.map(async (term) => {
+          try {
+            const gmail = getGmailClient(email);
+            const searchRes = await gmail.users.messages.list({
+              userId: "me",
+              q: term,
+              maxResults: 10,
+            });
 
-          if (!searchRes.data.messages) return [];
+            if (!searchRes.data.messages) return [];
 
-          const messages = await Promise.all(
-            searchRes.data.messages.slice(0, 5).map(async (msg) => {
-              const full = await gmail.users.messages.get({
-                userId: "me",
-                id: msg.id,
-                format: "metadata",
-                metadataHeaders: ["From", "To", "Subject", "Date"],
-              });
-              const headers = full.data.payload?.headers || [];
-              const getHeader = (name) =>
-                headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-              return {
-                id: msg.id,
-                account: email,
-                from: getHeader("From"),
-                to: getHeader("To"),
-                subject: getHeader("Subject"),
-                date: getHeader("Date"),
-                snippet: full.data.snippet || "",
-              };
-            })
-          );
-          return messages;
-        } catch (err) {
-          console.error(`Gmail error for ${email}:`, err.message);
-          return [];
-        }
-      })
+            const messages = await Promise.all(
+              searchRes.data.messages.slice(0, 8).map(async (msg) => {
+                const full = await gmail.users.messages.get({
+                  userId: "me",
+                  id: msg.id,
+                  format: "metadata",
+                  metadataHeaders: ["From", "To", "Subject", "Date"],
+                });
+                const headers = full.data.payload?.headers || [];
+                const getHeader = (name) =>
+                  headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+                return {
+                  id: msg.id,
+                  account: email,
+                  from: getHeader("From"),
+                  to: getHeader("To"),
+                  subject: getHeader("Subject"),
+                  date: getHeader("Date"),
+                  snippet: full.data.snippet || "",
+                };
+              })
+            );
+            return messages;
+          } catch (err) {
+            console.error(`Gmail error for ${email}:`, err.message);
+            return [];
+          }
+        })
+      )
     );
 
     // Dedupe emails by subject + date
@@ -105,11 +103,8 @@ export default async function handler(req, res) {
     // Sort newest first
     emails.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // 2. Search Notion for meeting transcripts (skip if DB not configured)
-    let meetings = [];
-    if (process.env.NOTION_TOKEN && process.env.NOTION_DATABASE_ID) {
-      meetings = await searchMeetings(searchTerm);
-    }
+    // 2. Search Notion for meeting transcripts
+    const meetings = await searchMeetings(searchTerm);
 
     // 3. Build people list from emails + attendees
     const peopleSet = new Set();
@@ -127,8 +122,6 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error("Claude summary error:", err.message);
       }
-    } else {
-      console.error("ANTHROPIC_API_KEY is not set — skipping AI summary");
     }
 
     const result = { company: searchTerm, summary, emails: emails.slice(0, 20), meetings, people };
@@ -148,29 +141,22 @@ export default async function handler(req, res) {
 
 async function generateSummary(company, emails, meetings, eventTitle) {
   const emailContext = emails.slice(0, 8).map(e =>
-    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject} — ${e.snippet}`
+    `[${e.date}] ${e.subject} — ${e.snippet}`
   ).join("\n");
 
   const meetingContext = meetings.slice(0, 5).map(m =>
     `[${m.date}] ${m.name} — ${m.summary || "No summary"}`
   ).join("\n");
 
-  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${company}" based on the context below. The calendar event title is: "${eventTitle}". Note: "${company}" may be a partial name — match liberally (e.g. "Insight" matches "Insight Partners", "Deutsche" matches "Deutsche Beteiligungsgesellschaft").
+  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${company}" based on the context below. Note: "${company}" may be a partial name — match liberally (e.g. "Insight" matches "Insight Partners", "Deutsche" matches "Deutsche Beteiligungsgesellschaft").
 
-EMAILS (sorted newest to oldest):
+EMAILS:
 ${emailContext || "None."}
 
 MEETINGS:
 ${meetingContext || "None."}
 
-Respond with exactly 3 to 5 bullet points. Start each line with "- " (dash space). Do not use markdown formatting. Each bullet must be a single factual statement — no narrative, no opinions, no filler words.
-
-Bullet point order:
-1. First bullet: the latest update or action item — what is this upcoming call/meeting about?
-2. Second bullet: when and who the FIRST (earliest/oldest) correspondence was with. Include the client contact's name and ALL @keye.co email addresses involved in that first email interaction (e.g. "- First contact on Jan 5 2026 between John Smith (Insight Partners) and dani@keye.co, r.parikh@keye.co").
-3. Remaining bullets: other key factual updates in reverse chronological order.
-
-If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${company}."`;
+Respond with exactly 3 to 5 bullet points, ordered from the most recent update to the earliest. Each bullet must be a single factual statement — no narrative, no opinions, no filler words. State only what happened, who was involved, and what was decided. Start each line with "- " (dash space). Do not use markdown formatting. If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${company}."`;
 
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
