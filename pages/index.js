@@ -15,7 +15,7 @@ const ACCOUNT_COLORS = {
   "rohan@keye.co": 3,
 };
 
-const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 7am - 8pm
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 12am - 11pm
 const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 function getMonday(d) {
@@ -73,6 +73,7 @@ export default function Home() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCache, setDetailCache] = useState({});
+  const [fetchedWeeks, setFetchedWeeks] = useState(new Set());
   const fetchedDetails = useRef(new Set());
 
   // Pre-fetch calendar events: 1 week back, 3 weeks forward
@@ -82,9 +83,33 @@ export default function Home() {
     const rangeEnd = addDays(thisMonday, 28);
     fetch(`/api/calendar?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}`)
       .then(res => res.json())
-      .then(data => { setAllEvents(data.events || []); setLoading(false); })
+      .then(data => {
+        setAllEvents(data.events || []);
+        const weeks = new Set();
+        for (let i = -1; i <= 3; i++) weeks.add(addDays(thisMonday, i * 7).toISOString());
+        setFetchedWeeks(weeks);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
+
+  const weekFetched = fetchedWeeks.has(weekStart.toISOString());
+  const [weekLoading, setWeekLoading] = useState(false);
+
+  const loadWeekEvents = async () => {
+    setWeekLoading(true);
+    const start = weekStart.toISOString();
+    const end = addDays(weekStart, 7).toISOString();
+    try {
+      const res = await fetch(`/api/calendar?start=${start}&end=${end}`);
+      const data = await res.json();
+      setAllEvents(prev => [...prev, ...(data.events || [])]);
+      setFetchedWeeks(prev => new Set([...prev, start]));
+    } catch (err) {
+      console.error("Failed to load week:", err);
+    }
+    setWeekLoading(false);
+  };
 
   // Pre-fetch all event details in background (3 concurrent)
   useEffect(() => {
@@ -165,7 +190,7 @@ export default function Home() {
     return () => clearInterval(timer);
   }, []);
   const nowHour = now.getHours() + now.getMinutes() / 60;
-  const nowTop = (nowHour - 7) * 60;
+  const nowTop = nowHour * 60;
 
   // Group events by day
   function eventsForDay(dayDate) {
@@ -214,7 +239,7 @@ export default function Home() {
         if (conflict) break;
         span = c + 1;
       }
-      const top = (item.startH - 7) * 60;
+      const top = item.startH * 60;
       const height = Math.max((item.endH - item.startH) * 60, 20);
       const left = `calc(${(col / totalCols) * 100}% + 1px)`;
       const width = `calc(${((span - col) / totalCols) * 100}% - 2px)`;
@@ -249,13 +274,22 @@ export default function Home() {
         </div>
       </div>
 
+      {/* LOAD EVENTS BUTTON */}
+      {!loading && !weekFetched && (
+        <div className="load-bar">
+          <button className="load-btn" onClick={loadWeekEvents} disabled={weekLoading}>
+            {weekLoading ? "Loading…" : "Load Events"}
+          </button>
+        </div>
+      )}
+
       {/* CALENDAR */}
       <div className="calendar-container">
         <div className="time-column">
           <div style={{ height: 60 }} />
           {HOURS.map(h => (
             <div key={h} className="time-label">
-              {h === 12 ? "12 PM" : h > 12 ? `${h - 12} PM` : `${h} AM`}
+              {h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
             </div>
           ))}
         </div>
@@ -270,7 +304,7 @@ export default function Home() {
                 {HOURS.map(h => (
                   <div key={h} className="hour-line" />
                 ))}
-                {day.toDateString() === todayStr && nowHour >= 7 && nowHour <= 21 && (
+                {day.toDateString() === todayStr && (
                   <div className="now-line" style={{ top: `${nowTop}px` }} />
                 )}
                 {!loading && layoutEvents(eventsForDay(day)).map(({ event, style }, ei) => (

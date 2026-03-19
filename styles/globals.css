@@ -117,11 +117,46 @@ body {
   border-radius: 2px;
 }
 
+/* LOAD EVENTS BAR */
+.load-bar {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.load-btn {
+  background: var(--today);
+  color: #111111;
+  border: none;
+  padding: 6px 24px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.load-btn:hover {
+  opacity: 0.85;
+}
+
+.load-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* CALENDAR GRID */
 .calendar-container {
   display: flex;
   height: calc(100vh - 64px);
   overflow: hidden;
+}
+
+.load-bar + .calendar-container {
+  height: calc(100vh - 64px - 40px);
 }
 
 .time-column {
