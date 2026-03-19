@@ -15,23 +15,8 @@ const ACCOUNT_COLORS = {
   "rohan@keye.co": 3,
 };
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i); // 12am - 11pm
-const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-function getMonday(d) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  date.setDate(diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
+const ACCOUNT_HEX = ["#039be5", "#7986cb", "#33b679", "#e67c73"];
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function formatTime(isoString) {
   const d = new Date(isoString);
@@ -47,17 +32,7 @@ function formatDate(isoString) {
   });
 }
 
-function formatMonthYear(monday) {
-  const sunday = addDays(monday, 6);
-  if (monday.getMonth() === sunday.getMonth()) {
-    return monday.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  }
-  return `${monday.toLocaleDateString("en-US", { month: "short" })} – ${sunday.toLocaleDateString("en-US", { month: "short", year: "numeric" })}`;
-}
-
-// Extract a "company name" guess from an event title
 function guessCompany(title) {
-  // Remove common prefixes/suffixes
   let clean = title
     .replace(/^(meeting|call|sync|demo|intro|check-in|standup|1:1)\s*(with|:|-|–)?\s*/i, "")
     .replace(/\s*(meeting|call|sync|demo|intro|check-in)$/i, "")
@@ -65,53 +40,75 @@ function guessCompany(title) {
   return clean || title;
 }
 
+// Build a 42-cell month grid (Monday start)
+function getMonthGrid(year, month) {
+  const firstOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let startDow = firstOfMonth.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
+
+  const cells = [];
+  const prevDays = new Date(year, month, 0).getDate();
+  for (let i = startDow - 1; i >= 0; i--) {
+    cells.push({ day: prevDays - i, otherMonth: true, date: new Date(year, month - 1, prevDays - i) });
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ day: d, otherMonth: false, date: new Date(year, month, d) });
+  }
+  const remaining = 42 - cells.length;
+  for (let d = 1; d <= remaining; d++) {
+    cells.push({ day: d, otherMonth: true, date: new Date(year, month + 1, d) });
+  }
+  return cells;
+}
+
 export default function Home() {
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [allEvents, setAllEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [cardPos, setCardPos] = useState({ left: 0, top: 0 });
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailCache, setDetailCache] = useState({});
-  const [fetchedWeeks, setFetchedWeeks] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   const fetchedDetails = useRef(new Set());
+  const fetchedMonths = useRef(new Set());
+  const calendarRef = useRef(null);
 
-  // Pre-fetch calendar events: 1 week back, 3 weeks forward
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const monthName = currentMonth.toLocaleDateString("en-US", { month: "long" });
+
+  // Fetch events for current month range
   useEffect(() => {
-    const thisMonday = getMonday(new Date());
-    const rangeStart = addDays(thisMonday, -7);
-    const rangeEnd = addDays(thisMonday, 28);
-    fetch(`/api/calendar?start=${rangeStart.toISOString()}&end=${rangeEnd.toISOString()}`)
+    const key = `${year}-${month}`;
+    if (fetchedMonths.current.has(key)) { setLoading(false); return; }
+
+    setLoading(true);
+    const start = new Date(year, month - 1, 1).toISOString();
+    const end = new Date(year, month + 2, 1).toISOString();
+    fetch(`/api/calendar?start=${start}&end=${end}`)
       .then(res => res.json())
       .then(data => {
-        setAllEvents(data.events || []);
-        const weeks = new Set();
-        for (let i = -1; i <= 3; i++) weeks.add(addDays(thisMonday, i * 7).toISOString());
-        setFetchedWeeks(weeks);
+        setAllEvents(prev => {
+          const existing = new Set(prev.map(e => `${e.title}|${e.start}`));
+          const fresh = (data.events || []).filter(e => !existing.has(`${e.title}|${e.start}`));
+          return [...prev, ...fresh];
+        });
+        fetchedMonths.current.add(key);
+        fetchedMonths.current.add(`${year}-${month - 1}`);
+        fetchedMonths.current.add(`${year}-${month + 1}`);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [year, month]);
 
-  const weekFetched = fetchedWeeks.has(weekStart.toISOString());
-  const [weekLoading, setWeekLoading] = useState(false);
-
-  const loadWeekEvents = async () => {
-    setWeekLoading(true);
-    const start = weekStart.toISOString();
-    const end = addDays(weekStart, 7).toISOString();
-    try {
-      const res = await fetch(`/api/calendar?start=${start}&end=${end}`);
-      const data = await res.json();
-      setAllEvents(prev => [...prev, ...(data.events || [])]);
-      setFetchedWeeks(prev => new Set([...prev, start]));
-    } catch (err) {
-      console.error("Failed to load week:", err);
-    }
-    setWeekLoading(false);
-  };
-
-  // Pre-fetch all event details in background (3 concurrent)
+  // Pre-fetch event details (3 concurrent)
   useEffect(() => {
     if (allEvents.length === 0) return;
     const queue = [];
@@ -137,15 +134,60 @@ export default function Home() {
         } catch {}
       }
     }
-    fetchNext(); fetchNext(); fetchNext(); // 3 concurrent workers
+    fetchNext(); fetchNext(); fetchNext();
   }, [allEvents]);
 
-  // Filter allEvents to current week for display
-  const events = allEvents.filter(e => {
-    const d = new Date(e.start);
-    return d >= weekStart && d < addDays(weekStart, 7);
-  });
+  // Navigation
+  const prevMonth = () => { setCurrentMonth(new Date(year, month - 1, 1)); setSelectedDate(null); };
+  const nextMonth = () => { setCurrentMonth(new Date(year, month + 1, 1)); setSelectedDate(null); };
 
+  // Calendar grid
+  const grid = getMonthGrid(year, month);
+  const today = new Date();
+  const todayStr = today.toDateString();
+
+  function eventsForDate(date) {
+    const dateStr = date.toDateString();
+    return allEvents.filter(e => new Date(e.start).toDateString() === dateStr);
+  }
+
+  const monthEvents = allEvents.filter(e => {
+    const d = new Date(e.start);
+    return d.getMonth() === month && d.getFullYear() === year;
+  }).sort((a, b) => new Date(a.start) - new Date(b.start));
+
+  const filteredEvents = searchQuery
+    ? monthEvents.filter(e =>
+        e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        e.account.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : monthEvents;
+
+  // Date click handler
+  const handleDateClick = (cell, e) => {
+    if (selectedDate && cell.date.toDateString() === selectedDate.toDateString()) {
+      setSelectedDate(null);
+      return;
+    }
+    if (cell.otherMonth) {
+      setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
+    }
+    const td = e.currentTarget;
+    const container = calendarRef.current;
+    if (td && container) {
+      const tdRect = td.getBoundingClientRect();
+      const cRect = container.getBoundingClientRect();
+      setCardPos({
+        left: tdRect.left - cRect.left,
+        top: tdRect.bottom - cRect.top + 8,
+      });
+    }
+    setSelectedDate(cell.date);
+  };
+
+  const selectedDateEvents = selectedDate ? eventsForDate(selectedDate) : [];
+
+  // Open event detail
   const openDetail = async (event) => {
     setSelectedEvent(event);
     const company = guessCompany(event.title);
@@ -174,161 +216,147 @@ export default function Home() {
     setDetail(null);
   };
 
-  const prevWeek = () => setWeekStart(addDays(weekStart, -7));
-  const nextWeek = () => setWeekStart(addDays(weekStart, 7));
-  const goToday = () => setWeekStart(getMonday(new Date()));
-
-  // Build days array for the week
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const today = new Date();
-  const todayStr = today.toDateString();
-
-  // Current time indicator
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-  const nowHour = now.getHours() + now.getMinutes() / 60;
-  const nowTop = nowHour * 60;
-
-  // Group events by day
-  function eventsForDay(dayDate) {
-    const dayStr = dayDate.toDateString();
-    return events.filter(e => {
-      const eDate = new Date(e.start);
-      return eDate.toDateString() === dayStr;
-    });
-  }
-
-  // Layout overlapping events into columns, expanding to fill free space
-  function layoutEvents(dayEvents) {
-    if (dayEvents.length === 0) return [];
-    const items = dayEvents.map(e => {
-      const s = new Date(e.start);
-      const en = new Date(e.end);
-      return { event: e, startH: s.getHours() + s.getMinutes() / 60, endH: en.getHours() + en.getMinutes() / 60 };
-    }).sort((a, b) => a.startH - b.startH || a.endH - b.endH);
-
-    // Assign each event to a column
-    const columns = [];
-    const itemCol = new Map();
-    for (const item of items) {
-      let placed = false;
-      for (let c = 0; c < columns.length; c++) {
-        if (columns[c].at(-1).endH <= item.startH) {
-          columns[c].push(item);
-          itemCol.set(item, c);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        itemCol.set(item, columns.length);
-        columns.push([item]);
-      }
-    }
-
-    const totalCols = columns.length;
-    return items.map(item => {
-      const col = itemCol.get(item);
-      // Expand right into free adjacent columns
-      let span = col + 1;
-      for (let c = col + 1; c < totalCols; c++) {
-        const conflict = columns[c].some(o => o.startH < item.endH && o.endH > item.startH);
-        if (conflict) break;
-        span = c + 1;
-      }
-      const top = item.startH * 60;
-      const height = Math.max((item.endH - item.startH) * 60, 20);
-      const left = `calc(${(col / totalCols) * 100}% + 1px)`;
-      const width = `calc(${((span - col) / totalCols) * 100}% - 2px)`;
-      return { event: item.event, style: { top: `${top}px`, height: `${height}px`, width, left } };
-    });
-  }
-
   return (
     <>
       <Head>
-        <title>Keyesight — Sales Calendar</title>
+        <title>Keyesight — Calendar</title>
+        <link
+          rel="stylesheet"
+          href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+          crossOrigin="anonymous"
+        />
       </Head>
 
-      {/* HEADER */}
-      <div className="header">
-        <div className="header-left">
-          <h1>Keyesight</h1>
-          <button className="today-btn" onClick={goToday}>Today</button>
-          <button className="nav-arrow" onClick={prevWeek}>&#8249;</button>
-          <button className="nav-arrow" onClick={nextWeek}>&#8250;</button>
-          <span className="month-label">{formatMonthYear(weekStart)}</span>
-        </div>
-        <div className="header-right">
+      <div className="container">
+        <header>
+          <h1>Keyesight Calendar</h1>
           <div className="legend">
             {ACCOUNTS.map((acc, i) => (
-              <div key={acc} className="legend-item">
-                <div className="legend-dot" style={{ background: `var(--accent-${i + 1})` }} />
+              <span key={acc} className="legend-item">
+                <span className="legend-dot" style={{ background: ACCOUNT_HEX[i] }} />
                 {acc.split("@")[0]}
-              </div>
+              </span>
             ))}
           </div>
-        </div>
-      </div>
+        </header>
 
-      {/* LOAD EVENTS BUTTON */}
-      {!loading && !weekFetched && (
-        <div className="load-bar">
-          <button className="load-btn" onClick={loadWeekEvents} disabled={weekLoading}>
-            {weekLoading ? "Loading…" : "Load Events"}
-          </button>
-        </div>
-      )}
+        {/* CALENDAR */}
+        <div ref={calendarRef} style={{ position: "relative" }}>
+          <div style={{ marginBottom: 12 }}>
+            <button className="ui-datepicker-prev" onClick={prevMonth}>Prev</button>
+            <button className="ui-datepicker-next" onClick={nextMonth}>Next</button>
+            <div className="ui-datepicker-title">{monthName} {year}</div>
+          </div>
 
-      {/* CALENDAR */}
-      <div className="calendar-container">
-        <div className="time-column">
-          <div style={{ height: 60 }} />
-          {HOURS.map(h => (
-            <div key={h} className="time-label">
-              {h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
-            </div>
-          ))}
-        </div>
-        <div className="days-grid">
-          {days.map((day, di) => (
-            <div key={di} className="day-column">
-              <div className={`day-header${day.toDateString() === todayStr ? " today" : ""}`}>
-                <div className="day-name">{DAYS[day.getDay()]}</div>
-                <div className="day-num">{day.getDate()}</div>
-              </div>
-              <div className="hour-slots">
-                {HOURS.map(h => (
-                  <div key={h} className="hour-line" />
-                ))}
-                {day.toDateString() === todayStr && (
-                  <div className="now-line" style={{ top: `${nowTop}px` }} />
-                )}
-                {!loading && layoutEvents(eventsForDay(day)).map(({ event, style }, ei) => (
-                  <div
-                    key={`${event.id}-${ei}`}
-                    className={`event-tile account-${ACCOUNT_COLORS[event.account] ?? 0}`}
-                    style={style}
-                    onClick={() => openDetail(event)}
-                  >
-                    <div className="event-time">{formatTime(event.start)}</div>
-                    <div className="event-title">{event.title}</div>
+          <table className="datepicker-table">
+            <thead>
+              <tr>
+                {DAY_NAMES.map(d => <th key={d}>{d}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 6 }, (_, row) => (
+                <tr key={row}>
+                  {grid.slice(row * 7, row * 7 + 7).map((cell, i) => {
+                    const isToday = cell.date.toDateString() === todayStr;
+                    const isSelected = selectedDate && cell.date.toDateString() === selectedDate.toDateString();
+                    const hasEvents = eventsForDate(cell.date).length > 0;
+                    const eventCount = eventsForDate(cell.date).length;
+                    return (
+                      <td
+                        key={i}
+                        className={[
+                          cell.otherMonth ? "other-month" : "",
+                          isToday ? "today-cell" : "",
+                          isSelected ? "ui-datepicker-current-day" : "",
+                          hasEvents ? "has-events" : "",
+                        ].filter(Boolean).join(" ")}
+                        onClick={(e) => handleDateClick(cell, e)}
+                      >
+                        <a className={isSelected ? "ui-state-active" : ""}>{cell.day}</a>
+                        {hasEvents && <span className="event-count">{eventCount}</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Event popup card */}
+          {selectedDate && selectedDateEvents.length > 0 && (
+            <div className="card event-card" style={{ display: "block", left: cardPos.left, top: cardPos.top }}>
+              <h6 className="card-date">
+                {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </h6>
+              {selectedDateEvents.map((event, i) => (
+                <div key={i} className="event-card-item" onClick={() => openDetail(event)}>
+                  <span className="event-dot" style={{ background: ACCOUNT_HEX[ACCOUNT_COLORS[event.account] ?? 0] }} />
+                  <div>
+                    <div className="event-card-title">{event.title}</div>
+                    <div className="event-card-time">
+                      {formatTime(event.start)} – {formatTime(event.end)}
+                      <span className="event-card-account"> · {event.account.split("@")[0]}</span>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          )}
 
-      {loading && (
-        <div className="loading" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }}>
-          <div className="loading-spinner" /> Loading calendar…
+          {selectedDate && selectedDateEvents.length === 0 && (
+            <div className="card event-card" style={{ display: "block", left: cardPos.left, top: cardPos.top }}>
+              <h6 className="card-date">
+                {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </h6>
+              <div style={{ color: "#999", fontSize: 13 }}>No events</div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* SEARCH */}
+        <input
+          type="text"
+          placeholder="Search Events"
+          className="form-control"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          style={{ marginTop: 24, marginBottom: 16 }}
+        />
+
+        {/* EVENTS TABLE */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#999" }}>Loading events...</div>
+        ) : (
+          <table className="table table-dark" id="events-list">
+            <thead>
+              <tr>
+                <td>Date</td>
+                <td>Event Name</td>
+                <td>Account</td>
+                <td>Time</td>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEvents.map((event, i) => (
+                <tr key={i} onClick={() => openDetail(event)} style={{ cursor: "pointer" }}>
+                  <td>{new Date(event.start).toLocaleDateString()}</td>
+                  <td>
+                    <span className="table-dot" style={{ background: ACCOUNT_HEX[ACCOUNT_COLORS[event.account] ?? 0] }} />
+                    {event.title}
+                  </td>
+                  <td>{event.account.split("@")[0]}</td>
+                  <td>{formatTime(event.start)} – {formatTime(event.end)}</td>
+                </tr>
+              ))}
+              {filteredEvents.length === 0 && (
+                <tr><td colSpan={4} style={{ textAlign: "center", color: "#999" }}>No events found</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {/* DETAIL PANEL */}
       {selectedEvent && (
@@ -338,7 +366,7 @@ export default function Home() {
             <div className="detail-header">
               <div>
                 <h2>{selectedEvent.title}</h2>
-                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
                   {selectedEvent.account}
                 </div>
               </div>
@@ -348,15 +376,17 @@ export default function Home() {
               <div>📅 {formatDate(selectedEvent.start)} · {formatTime(selectedEvent.start)} – {formatTime(selectedEvent.end)}</div>
               {selectedEvent.location && <div>📍 {selectedEvent.location}</div>}
               {selectedEvent.hangoutLink && (
-                <div>🔗 <a href={selectedEvent.hangoutLink} target="_blank" rel="noreferrer" style={{ color: "var(--accent-1)" }}>Join Google Meet</a></div>
+                <div>🔗 <a href={selectedEvent.hangoutLink} target="_blank" rel="noreferrer" style={{ color: "#006db3" }}>Join Google Meet</a></div>
               )}
             </div>
 
             {detailLoading ? (
-              <div className="loading"><div className="loading-spinner" /> Pulling deal context…</div>
+              <div className="detail-loading">
+                <div className="spinner-border spinner-border-sm" role="status" />
+                <span style={{ marginLeft: 8 }}>Pulling deal context…</span>
+              </div>
             ) : detail ? (
               <>
-                {/* Claude Summary */}
                 {detail.summary && (
                   <div className="detail-section">
                     <h3>AI Summary</h3>
@@ -368,13 +398,12 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Attendees from the event itself */}
                 {selectedEvent.attendees?.length > 0 && (
                   <div className="detail-section">
                     <h3>Attendees</h3>
                     <div className="people-list">
                       {selectedEvent.attendees.map((a, i) => (
-                        <span key={i} className="person-tag">
+                        <span key={i} className="badge badge-secondary mr-1 mb-1">
                           {a.name || a.email}
                           {a.status === "accepted" ? " ✓" : a.status === "declined" ? " ✗" : ""}
                         </span>
@@ -383,7 +412,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Email Threads */}
                 {detail.emails?.length > 0 && (
                   <div className="detail-section">
                     <h3>Email Threads ({detail.emails.length})</h3>
@@ -397,7 +425,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Notion Meetings */}
                 {detail.meetings?.length > 0 && (
                   <div className="detail-section">
                     <h3>Meeting Transcripts ({detail.meetings.length})</h3>
@@ -407,7 +434,7 @@ export default function Home() {
                         <div className="meeting-date">{m.date}</div>
                         {m.summary && <div className="meeting-summary">{m.summary}</div>}
                         {m.tasks && (
-                          <div className="meeting-summary" style={{ color: "var(--accent-3)" }}>
+                          <div className="meeting-summary" style={{ color: "#33b679" }}>
                             Tasks: {m.tasks}
                           </div>
                         )}
@@ -416,13 +443,12 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* People */}
                 {detail.people?.length > 0 && (
                   <div className="detail-section">
                     <h3>People Involved</h3>
                     <div className="people-list">
                       {detail.people.map((p, i) => (
-                        <span key={i} className="person-tag">{p}</span>
+                        <span key={i} className="badge badge-secondary mr-1 mb-1">{p}</span>
                       ))}
                     </div>
                   </div>
