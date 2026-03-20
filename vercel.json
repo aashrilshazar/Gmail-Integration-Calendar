@@ -1,6 +1,6 @@
 {
   "functions": {
-    "pages/api/event/detail.js": {
+    "api/lookup.js": {
       "maxDuration": 60
     }
   }
