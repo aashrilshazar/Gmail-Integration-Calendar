@@ -1,6 +1,11 @@
 {
+  "buildCommand": "",
+  "framework": null,
   "functions": {
     "api/lookup.js": {
+      "maxDuration": 60
+    },
+    "api/slack.js": {
       "maxDuration": 60
     }
   }
