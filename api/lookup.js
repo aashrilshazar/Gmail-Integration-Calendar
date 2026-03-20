@@ -9,58 +9,7 @@ export default async function handler(req, res) {
   if (!firm) return res.status(400).json({ error: "Provide a firm name" });
 
   try {
-    // 1. Search Gmail across all accounts
-    const emailResults = await Promise.all(
-      ACCOUNTS.map(async (email) => {
-        try {
-          const gmail = getGmailClient(email);
-          const searchRes = await gmail.users.messages.list({
-            userId: "me",
-            q: firm,
-            maxResults: 8,
-          });
-
-          if (!searchRes.data.messages) return [];
-
-          const messages = await Promise.all(
-            searchRes.data.messages.slice(0, 5).map(async (msg) => {
-              const full = await gmail.users.messages.get({
-                userId: "me",
-                id: msg.id,
-                format: "metadata",
-                metadataHeaders: ["From", "To", "Subject", "Date"],
-              });
-              const headers = full.data.payload?.headers || [];
-              const getHeader = (name) =>
-                headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-              return {
-                account: email,
-                from: getHeader("From"),
-                to: getHeader("To"),
-                subject: getHeader("Subject"),
-                date: getHeader("Date"),
-                snippet: full.data.snippet || "",
-              };
-            })
-          );
-          return messages;
-        } catch (err) {
-          console.error(`Gmail error for ${email}:`, err.message);
-          return [];
-        }
-      })
-    );
-
-    // Dedupe emails by subject + date
-    const seen = new Set();
-    const emails = emailResults.flat().filter(e => {
-      const key = `${e.subject}|${e.date}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    // 2. Search Calendar across all accounts
+    // 1. Search Calendar first (so we can extract attendee domains for Gmail search)
     const now = new Date();
     const sixMonthsAgo = new Date(now);
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
@@ -107,7 +56,78 @@ export default async function handler(req, res) {
       return true;
     }).sort((a, b) => new Date(b.start) - new Date(a.start));
 
-    // 3. Build people list
+    // 2. Extract non-Keye attendee domains and emails from calendar events
+    const keyeDomains = new Set(["keye.co"]);
+    const externalDomains = new Set();
+    const externalEmails = new Set();
+    calendarEvents.forEach(e => {
+      e.attendees.forEach(a => {
+        const domain = a.email.split("@")[1];
+        if (domain && !keyeDomains.has(domain)) {
+          externalDomains.add(domain);
+          externalEmails.add(a.email);
+        }
+      });
+    });
+
+    // Build Gmail search queries: firm name + each external domain
+    const searchQueries = [firm];
+    externalDomains.forEach(domain => searchQueries.push(domain));
+
+    // 3. Search Gmail using firm name AND attendee domains
+    const emailResults = await Promise.all(
+      ACCOUNTS.flatMap((account) =>
+        searchQueries.map(async (query) => {
+          try {
+            const gmail = getGmailClient(account);
+            const searchRes = await gmail.users.messages.list({
+              userId: "me",
+              q: query,
+              maxResults: 8,
+            });
+
+            if (!searchRes.data.messages) return [];
+
+            const messages = await Promise.all(
+              searchRes.data.messages.slice(0, 5).map(async (msg) => {
+                const full = await gmail.users.messages.get({
+                  userId: "me",
+                  id: msg.id,
+                  format: "metadata",
+                  metadataHeaders: ["From", "To", "Subject", "Date"],
+                });
+                const headers = full.data.payload?.headers || [];
+                const getHeader = (name) =>
+                  headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+                return {
+                  account,
+                  from: getHeader("From"),
+                  to: getHeader("To"),
+                  subject: getHeader("Subject"),
+                  date: getHeader("Date"),
+                  snippet: full.data.snippet || "",
+                };
+              })
+            );
+            return messages;
+          } catch (err) {
+            console.error(`Gmail error for ${account} (q=${query}):`, err.message);
+            return [];
+          }
+        })
+      )
+    );
+
+    // Dedupe emails by subject + date
+    const seen = new Set();
+    const emails = emailResults.flat().filter(e => {
+      const key = `${e.subject}|${e.date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // 4. Build people list
     const peopleSet = new Set();
     emails.forEach(e => {
       if (e.from) peopleSet.add(e.from);
