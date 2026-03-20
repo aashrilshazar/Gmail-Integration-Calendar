@@ -157,11 +157,22 @@ app.post("/lookup", async (req, res) => {
     });
     const people = [...peopleSet].slice(0, 30);
 
-    // 4. Generate AI summary
+    // Filter emails to only those involving the firm or external attendee domains
+    const firmLower = firm.toLowerCase();
+    const relevantEmails = emails.filter(e => {
+      const text = `${e.from} ${e.to} ${e.subject}`.toLowerCase();
+      if (text.includes(firmLower)) return true;
+      for (const domain of externalDomains) {
+        if (text.includes(domain)) return true;
+      }
+      return false;
+    });
+
+    // 5. Generate AI summary
     let summary = null;
     if (process.env.ANTHROPIC_API_KEY) {
       try {
-        summary = await generateSummary(firm, emails, calendarEvents);
+        summary = await generateSummary(firm, relevantEmails, calendarEvents);
       } catch (err) {
         console.error("Claude summary error:", err.message);
       }
