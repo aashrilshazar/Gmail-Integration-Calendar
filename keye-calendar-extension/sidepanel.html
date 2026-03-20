@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Keye Deal Context</title>
+<style>
+  :root {
+    --bg: #111111;
+    --surface: #1e1e1e;
+    --border: #3c3c3c;
+    --border-light: #2a2a2a;
+    --text: #e8eaed;
+    --text-muted: #9aa0a6;
+    --today: #8ab4f8;
+    --green: #33b679;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-y: auto;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .header__logo {
+    width: 20px; height: 20px;
+    background: var(--today);
+    border-radius: 4px;
+  }
+  .header__title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* Empty / loading states */
+  .state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .state--loading::after {
+    content: "";
+    display: block;
+    width: 24px; height: 24px;
+    margin: 16px auto 0;
+    border: 2px solid var(--border);
+    border-top-color: var(--today);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Event header */
+  .event-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .event-header h2 {
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  /* Section */
+  .section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section h3 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  /* Bullets */
+  .bullets {
+    list-style: disc;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.7;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .bullets li::marker { color: var(--border); }
+
+  /* Email card */
+  .email {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .email:last-child { border-bottom: none; }
+  .email__subject {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .email__meta {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .email__snippet {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .email__snippet--tasks {
+    color: var(--green);
+  }
+
+  /* Tags */
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 12px;
+  }
+
+  /* Error */
+  .error {
+    color: #e67c73;
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header__logo"></div>
+  <div class="header__title">Keye Deal Context</div>
+</div>
+
+<div id="root">
+  <div class="state">Click a calendar event to see deal context.</div>
+</div>
+
+<script>
+const BACKEND = "https://gmail-integration-calendar.vercel.app";
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours in ms
+const root = document.getElementById("root");
+
+// --- guessCompany: ported from pages/index.js ---
+function guessCompany(title) {
+  if (title.includes("<>")) {
+    const parts = title.split("<>").map(p => p.trim());
+    const strip = s => s
+      .replace(/^\[.*?\]\s*~?\s*/g, "")
+      .replace(/^(ZOOM|Call|Connect|Meeting)\s*[|/]+\s*/i, "")
+      .trim();
+    const isKeye = p => /keye/i.test(p) ||
+      /^(rohan|dani|conor|morgan|anthony|lalit|aashril|ryan|r\.?\s*parikh|rparikh)/i.test(strip(p));
+    const other = parts.find(p => !isKeye(p));
+    if (other) return strip(other) || other;
+    return strip(parts[1]) || parts[1];
+  }
+  let clean = title
+    .replace(/^(meeting|call|sync|demo|intro|check-in|standup|1:1)\s*(with|:|-|\u2013)?\s*/i, "")
+    .replace(/\s*(meeting|call|sync|demo|intro|check-in)$/i, "")
+    .trim();
+  return clean || title;
+}
+
+// --- Local cache using chrome.storage.local ---
+async function getCached(key) {
+  return new Promise(resolve => {
+    chrome.storage.local.get(key, (result) => {
+      const entry = result[key];
+      if (entry && Date.now() - entry.ts < CACHE_TTL) {
+        resolve(entry.data);
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+async function setCache(key, data) {
+  chrome.storage.local.set({ [key]: { data, ts: Date.now() } });
+}
+
+// --- Render functions ---
+function renderLoading(title) {
+  root.innerHTML = `
+    <div class="event-header"><h2>${esc(title)}</h2></div>
+    <div class="state state--loading">Pulling deal context\u2026</div>
+  `;
+}
+
+function renderError(title, msg) {
+  root.innerHTML = `
+    <div class="event-header"><h2>${esc(title)}</h2></div>
+    <div class="error">${esc(msg)}</div>
+  `;
+}
+
+function renderDetail(title, detail) {
+  let html = `<div class="event-header"><h2>${esc(title)}</h2></div>`;
+
+  // AI Summary
+  if (detail.summary) {
+    const bullets = detail.summary.split("\n")
+      .map(l => l.trim().replace(/^-\s*/, ""))
+      .filter(l => l);
+    html += `<div class="section"><h3>AI Summary</h3><ul class="bullets">`;
+    for (const b of bullets) {
+      html += `<li>${esc(b)}</li>`;
+    }
+    html += `</ul></div>`;
+  }
+
+  // Email Threads
+  if (detail.emails?.length > 0) {
+    html += `<div class="section"><h3>Email Threads (${detail.emails.length})</h3>`;
+    for (const e of detail.emails) {
+      html += `<div class="email">
+        <div class="email__subject">${esc(e.subject)}</div>
+        <div class="email__meta">${esc(e.from)} \u00b7 ${esc(e.date)}</div>
+        ${e.snippet ? `<div class="email__snippet">${esc(e.snippet)}</div>` : ""}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Meeting Transcripts
+  if (detail.meetings?.length > 0) {
+    html += `<div class="section"><h3>Meeting Transcripts (${detail.meetings.length})</h3>`;
+    for (const m of detail.meetings) {
+      html += `<div class="email">
+        <div class="email__subject">${esc(m.name)}</div>
+        <div class="email__meta">${esc(m.date || "")}</div>
+        ${m.summary ? `<div class="email__snippet">${esc(m.summary)}</div>` : ""}
+        ${m.tasks ? `<div class="email__snippet email__snippet--tasks">Tasks: ${esc(m.tasks)}</div>` : ""}
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  // People
+  if (detail.people?.length > 0) {
+    html += `<div class="section"><h3>People Involved</h3><div class="tags">`;
+    for (const p of detail.people) {
+      html += `<span class="tag">${esc(p)}</span>`;
+    }
+    html += `</div></div>`;
+  }
+
+  // Empty state
+  if (!detail.summary && !detail.emails?.length && !detail.meetings?.length) {
+    html += `<div class="state">No additional context found for this event.</div>`;
+  }
+
+  root.innerHTML = html;
+}
+
+function esc(s) {
+  const div = document.createElement("div");
+  div.textContent = s || "";
+  return div.innerHTML;
+}
+
+// --- Fetch deal context ---
+async function loadDetail(eventTitle) {
+  const company = guessCompany(eventTitle);
+  const cacheKey = `detail:${company}|${eventTitle}`;
+
+  // Check local cache
+  const cached = await getCached(cacheKey);
+  if (cached) {
+    renderDetail(eventTitle, cached);
+    return;
+  }
+
+  renderLoading(eventTitle);
+
+  try {
+    const params = new URLSearchParams({
+      company,
+      eventTitle,
+    });
+    const res = await fetch(`${BACKEND}/api/event/detail?${params}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    await setCache(cacheKey, data);
+    renderDetail(eventTitle, data);
+  } catch (err) {
+    renderError(eventTitle, `Failed to load: ${err.message}`);
+  }
+}
+
+// --- Listen for events from content script (via background) ---
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.type === "SHOW_DETAIL" && message.data?.eventTitle) {
+    loadDetail(message.data.eventTitle);
+  }
+  if (message.type === "EVENT_CLICKED" && message.data?.eventTitle) {
+    loadDetail(message.data.eventTitle);
+  }
+});
+</script>
+</body>
+</html>
