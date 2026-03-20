@@ -56,23 +56,21 @@ export default async function handler(req, res) {
       return true;
     }).sort((a, b) => new Date(b.start) - new Date(a.start));
 
-    // 2. Extract non-Keye attendee domains and emails from calendar events
+    // 2. Extract non-Keye attendee domains from calendar events
     const keyeDomains = new Set(["keye.co"]);
     const externalDomains = new Set();
-    const externalEmails = new Set();
     calendarEvents.forEach(e => {
       e.attendees.forEach(a => {
         const domain = a.email.split("@")[1];
         if (domain && !keyeDomains.has(domain)) {
           externalDomains.add(domain);
-          externalEmails.add(a.email);
         }
       });
     });
 
-    // Build Gmail search queries: firm name + each external domain
+    // Build Gmail search queries: firm name + from/to each external domain
     const searchQueries = [firm];
-    externalDomains.forEach(domain => searchQueries.push(domain));
+    externalDomains.forEach(domain => searchQueries.push(`from:${domain} OR to:${domain}`));
 
     // 3. Search Gmail using firm name AND attendee domains
     const emailResults = await Promise.all(

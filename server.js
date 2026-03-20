@@ -89,9 +89,9 @@ app.post("/lookup", async (req, res) => {
       });
     });
 
-    // Build Gmail search queries: firm name + each external domain
+    // Build Gmail search queries: firm name + from/to each external domain
     const searchQueries = [firm];
-    externalDomains.forEach(domain => searchQueries.push(domain));
+    externalDomains.forEach(domain => searchQueries.push(`from:${domain} OR to:${domain}`));
 
     // 3. Search Gmail using firm name AND attendee domains
     const emailResults = await Promise.all(
