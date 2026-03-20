@@ -1,4 +1,5 @@
 import { getGmailClient, getCalendarClient, ACCOUNTS } from "../lib/google.js";
+import { waitUntil } from "@vercel/functions";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -16,17 +17,19 @@ export default async function handler(req, res) {
     });
   }
 
+  // Keep the function alive after responding so the lookup can complete
+  waitUntil(doLookup(firm, responseUrl));
+
   // ACK immediately so Slack doesn't timeout
-  res.status(200).json({
+  return res.status(200).json({
     response_type: "in_channel",
     text: `Looking up *${firm}*...`,
   });
+}
 
-  // Do the actual lookup in the background
+async function doLookup(firm, responseUrl) {
   try {
     const result = await lookup(firm);
-
-    // Post result back to Slack via response_url
     await fetch(responseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

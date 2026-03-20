@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@upstash/redis": "^1.37.0",
+    "@vercel/functions": "^3.4.3",
     "dotenv": "^17.3.1",
     "express": "^4.21.0",
     "googleapis": "^144.0.0"
