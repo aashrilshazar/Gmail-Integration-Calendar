@@ -157,7 +157,7 @@ Respond with exactly 3 to 5 bullet points. Start each line with "- " (dash space
 
 Bullet point order:
 1. First bullet: the latest update or action item.
-2. Second bullet: when and who the FIRST (earliest/oldest) correspondence was with. Include names and @keye.co emails involved.
+2. Second bullet: how the most recent calendar meeting was scheduled — who from Keye reached out to who at the firm, on what date, and the context/subject of that outreach (e.g. "Dani Kobrick reached out to Pieter Cilliers as part of the INSEAD Alumni outreach on Feb 25, 2026"). Look at the earliest email thread that led to this meeting being booked.
 3. Remaining bullets: other key factual updates in reverse chronological order.
 
 If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${firm}."`;
