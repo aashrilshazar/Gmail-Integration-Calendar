@@ -1,8 +1,8 @@
 import { Redis } from "@upstash/redis";
 
-const redis = process.env.KV_REST_API_URL
-  ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
-  : null;
+const redisUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const redis = redisUrl ? new Redis({ url: redisUrl, token: redisToken }) : null;
 
 const KEY = "keye:recent_chats";
 const MAX = 20;

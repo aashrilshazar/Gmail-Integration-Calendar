@@ -8,9 +8,9 @@ const app = express();
 app.use(express.json());
 app.use(express.static("public"));
 
-const redis = process.env.KV_REST_API_URL
-  ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
-  : null;
+const redisUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const redis = redisUrl ? new Redis({ url: redisUrl, token: redisToken }) : null;
 
 const CACHE_TTL = 6 * 60 * 60; // 6 hours
 
