@@ -661,7 +661,10 @@
 </div>
 
 <script>
-  marked.setOptions({ breaks: false, gfm: true });
+  const renderer = new marked.Renderer();
+  renderer.link = ({ href, title, text }) =>
+    `<a href="${href}"${title ? ` title="${title}"` : ''} target="_blank" rel="noopener noreferrer">${text}</a>`;
+  marked.setOptions({ breaks: false, gfm: true, renderer });
 
   let context = null;
   let chatMessages = [];
