@@ -448,6 +448,44 @@
       40%           { opacity: 0.9; }
     }
 
+    /* ── Search tip tile ── */
+    .search-tip {
+      font-size: 12px;
+      color: var(--text-3);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      line-height: 1.6;
+      max-width: 720px;
+      width: 100%;
+      margin: 0 auto;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+    .search-tip-icon { flex-shrink: 0; font-size: 14px; opacity: 0.5; margin-top: 1px; }
+    .search-tip code {
+      color: var(--text-2);
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 11px;
+      background: #1e1e1e;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    /* ── Search result label ── */
+    .search-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-3);
+      margin-bottom: 8px;
+    }
+
     /* ── Suggestion chips ── */
     .suggestion-chips {
       display: flex;
@@ -627,13 +665,21 @@
     if (!text) return;
     mainInput.value = '';
     mainInput.style.height = 'auto';
-    doChat(text);
+    if (text.toLowerCase().startsWith('/search ')) {
+      doSearch(text.slice(8).trim());
+    } else {
+      doChat(text);
+    }
   }
   function handleLandingSend() {
     if (isLoading) return;
     const text = landingInput.value.trim();
     if (!text) return;
-    doLookup(text);
+    if (text.toLowerCase().startsWith('/search ')) {
+      doSearch(text.slice(8).trim());
+    } else {
+      doLookup(text);
+    }
   }
   function handleCallPrep() {
     if (isLoading) return;
@@ -736,6 +782,13 @@
         chipsEl.appendChild(btn);
       });
       msgArea.appendChild(chipsEl);
+
+      // Search tip tile
+      const tipEl = document.createElement('div');
+      tipEl.className = 'search-tip';
+      tipEl.innerHTML = `<span class="search-tip-icon">⌕</span><span>Type <code>/search [query]</code> to look up anyone at this firm — title, team, location, prior experience, and more.</span>`;
+      msgArea.appendChild(tipEl);
+
       scrollBottom();
 
       saveSearch(firm);
@@ -745,7 +798,7 @@
       firmBadge.textContent = data.firm;
       firmBadge.style.display = 'block';
       newSrchBtn.style.display = 'block';
-      mainInput.placeholder = `Ask anything about ${data.firm}...`;
+      mainInput.placeholder = `Ask anything, or /search [name] to look someone up…`;
 
     } catch (err) {
       cancelled = true;
@@ -888,6 +941,42 @@
     }
 
     addMsg('assistant', card);
+  }
+
+  // ── Web Search ───────────────────────────────────────────
+  async function doSearch(query) {
+    if (!query) return;
+    isLoading = true;
+    sendBtn.disabled = true;
+
+    addMsg('user', `/search ${query}`);
+
+    // Search loading indicator
+    const searchLoad = document.createElement('div');
+    searchLoad.className = 'think-chain';
+    searchLoad.innerHTML = `<div class="think-step active"><div class="think-indicator"></div><span>Searching the web…</span></div>`;
+    const searchRow = addMsg('assistant', searchLoad);
+
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, firm: context?.firm || null }),
+      });
+      const data = await res.json();
+      searchRow.remove();
+
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `<div class="search-label">⌕ Web search</div>` + marked.parse(data.answer || 'No results found.');
+      addMsg('assistant', wrapper);
+    } catch (err) {
+      searchRow.remove();
+      addMsg('assistant', `Search error: ${err.message}`);
+    }
+
+    isLoading = false;
+    sendBtn.disabled = false;
+    mainInput.focus();
   }
 
   // ── Chat ─────────────────────────────────────────────────

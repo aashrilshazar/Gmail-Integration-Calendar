@@ -196,6 +196,51 @@ async function handleLookup(req, res) {
 app.post("/lookup", handleLookup);
 app.post("/api/lookup", handleLookup);
 
+app.post("/api/search", async (req, res) => {
+  const { query, firm } = req.body || {};
+  if (!query) return res.status(400).json({ error: "Provide a query" });
+
+  const system = `You are a research assistant for Keye, a PE-focused AI due diligence platform. Answer questions about people and firms using web search. When researching a person, check their firm's team page, LinkedIn, and recent news. Be concise and cite sources.${firm ? `\n\nFirm context: ${firm}.` : ""}`;
+  const messages = [{ role: "user", content: query }];
+
+  try {
+    for (let i = 0; i < 6; i++) {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": process.env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-beta": "web-search-2025-03-05",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1024,
+          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          system,
+          messages,
+        }),
+      });
+      const data = await response.json();
+      if (data.error) return res.status(500).json({ error: data.error.message });
+      const textBlock = data.content?.find(b => b.type === "text");
+      if (data.stop_reason === "end_turn") return res.json({ answer: textBlock?.text || "No results found." });
+      if (data.stop_reason === "tool_use") {
+        messages.push({ role: "assistant", content: data.content });
+        const toolUses = data.content.filter(b => b.type === "tool_use");
+        if (!toolUses.length) return res.json({ answer: textBlock?.text || "No results found." });
+        messages.push({ role: "user", content: toolUses.map(b => ({ type: "tool_result", tool_use_id: b.id, content: b.result ?? "" })) });
+      } else {
+        return res.json({ answer: textBlock?.text || "No results found." });
+      }
+    }
+    res.json({ answer: "Search reached iteration limit." });
+  } catch (err) {
+    console.error("Search error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/chat", async (req, res) => {
   const { messages, context } = req.body || {};
   if (!messages || !context) return res.status(400).json({ error: "Provide messages and context" });
