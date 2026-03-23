@@ -36,7 +36,7 @@ Be concise and factual. Cite your sources (site name or URL). If you cannot find
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 1024,
+          max_tokens: 4096,
           tools: [{ type: "web_search_20250305", name: "web_search" }],
           system,
           messages,
