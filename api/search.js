@@ -11,16 +11,41 @@ export default async function handler(req, res) {
     knownContacts ? `Known contacts from emails/calendar: ${knownContacts}` : null,
   ].filter(Boolean).join("\n");
 
+  // Detect person name queries: 2-4 title-cased words (e.g. "Roshni Gill", "John A. Smith")
+  const looksLikeName = /^[A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+){1,3}$/.test(query.trim());
+
+  const bioFormat = looksLikeName ? `
+Format your response as a structured profile using these exact markdown sections (skip any section if no reliable data exists):
+
+**[Full Name] — [Title], [Firm]**
+
+**Current Role**
+One concise paragraph: title, team, location, and when they joined.
+
+**Prior Experience**
+One concise paragraph in reverse chronological order.
+
+**Education**
+One line: degree(s) and institution(s).
+
+**Keye Contact Info**
+Email or contact details from the internal context, if available.
+
+**Sources**
+List sources as markdown links.
+
+Do not include an introductory sentence like "Here is a summary of...". Start directly with the bold name/title line.` : `
+Respond in clear markdown. Use **bold** for names and titles, ## for section headers if needed. Write full paragraphs — do not list one sentence per line. Cite sources as markdown links.`;
+
   const system = `You are a web research assistant for Keye, a PE-focused AI due diligence platform. Your job is to look up public information — titles, roles, teams, locations, prior experience, and background — using web search.
 
 ${contextBlock ? `CONTEXT FROM KEYE'S INTERNAL DATA:\n${contextBlock}\n\nUse this to inform your searches (e.g. search for the right person at the right firm). Do not describe or repeat this internal context in your answer — just use it to search more accurately.` : ""}
 
-When researching a person:
-1. Search the firm's website team/about page
-2. Search LinkedIn for current role, team, location, and prior experience
-3. Check recent news or press if relevant
-
-Be concise and factual. Cite your sources (site name or URL). If you cannot find reliable public information, say so plainly.`;
+FORMATTING:
+- Do NOT hard-wrap text within paragraphs. Write each paragraph as a single unbroken block of text.
+- Use blank lines between sections.
+- Do not use bullet points for prose — write in sentences.
+${bioFormat}`;
 
   const messages = [{ role: "user", content: query }];
 
