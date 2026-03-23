@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Provide messages and context" });
   }
 
-  const emailContext = (context.emails || []).slice(0, 15).map(e =>
+  const emailContext = (context.emails || []).slice(0, 30).map(e =>
     `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject} — ${e.snippet}`
   ).join("\n");
 

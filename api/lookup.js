@@ -73,13 +73,13 @@ export default async function handler(req, res) {
             const searchRes = await gmail.users.messages.list({
               userId: "me",
               q: query,
-              maxResults: 8,
+              maxResults: 20,
             });
 
             if (!searchRes.data.messages) return [];
 
             const messages = await Promise.all(
-              searchRes.data.messages.slice(0, 5).map(async (msg) => {
+              searchRes.data.messages.slice(0, 10).map(async (msg) => {
                 const full = await gmail.users.messages.get({
                   userId: "me",
                   id: msg.id,
@@ -149,7 +149,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const result = { firm, summary, emails: emails.slice(0, 20), calendarEvents, people };
+    const result = { firm, summary, emails: emails.slice(0, 40), calendarEvents, people };
     res.json(result);
   } catch (err) {
     console.error("Lookup error:", err);
