@@ -298,7 +298,7 @@
       font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--text-3);
+      color: var(--text);
       margin-bottom: 12px;
     }
 
@@ -345,13 +345,19 @@
       user-select: none;
       transition: background 0.15s;
     }
-    .collapsible-header:hover { background: rgba(255,255,255,0.02); }
+    .collapsible-header:hover { background: rgba(255,255,255,0.04); }
     .collapsible-chevron {
-      font-size: 10px;
-      color: var(--text-3);
+      font-size: 11px;
+      color: var(--text-2);
       transition: transform 0.2s;
+      margin-left: 8px;
     }
     .collapsible-header[data-open="true"] .collapsible-chevron { transform: rotate(90deg); }
+    .collapsible-hint {
+      font-size: 10px;
+      color: var(--text-3);
+      letter-spacing: 0.02em;
+    }
     .collapsible-body { display: none; padding: 0 20px 14px; }
     .collapsible-body.open { display: block; }
 
@@ -818,7 +824,7 @@
       const collHeader = document.createElement('div');
       collHeader.className = 'collapsible-header';
       collHeader.setAttribute('data-open', 'false');
-      collHeader.innerHTML = `<span class="section-label" style="margin-bottom:0">Meeting History (${meetCount})</span><span class="collapsible-chevron">▸</span>`;
+      collHeader.innerHTML = `<span class="section-label" style="margin-bottom:0">Meeting History (${meetCount})</span><span style="display:flex;align-items:center;gap:6px"><span class="collapsible-hint">expand</span><span class="collapsible-chevron">▸</span></span>`;
 
       const collBody = document.createElement('div');
       collBody.className = 'collapsible-body';
@@ -827,6 +833,8 @@
         const open = collHeader.getAttribute('data-open') === 'true';
         collHeader.setAttribute('data-open', String(!open));
         collBody.classList.toggle('open', !open);
+        const hint = collHeader.querySelector('.collapsible-hint');
+        if (hint) hint.textContent = open ? 'expand' : 'collapse';
       };
 
       if (meetCount) {
