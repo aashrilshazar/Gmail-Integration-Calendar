@@ -166,6 +166,22 @@
     .sb-recents::-webkit-scrollbar { width: 2px; }
     .sb-recents::-webkit-scrollbar-thumb { background: #222; }
 
+    #sb-filter {
+      display: none;
+      width: calc(100% - 28px);
+      margin: 4px 14px 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+    }
+    #sidebar.open #sb-filter { display: block; }
+    #sb-filter::placeholder { color: var(--text-3); }
+
     .sb-recent-item {
       display: block;
       width: 100%;
@@ -637,6 +653,7 @@
     <div class="sb-divider"></div>
 
     <div class="sb-section-label">Recents</div>
+    <input id="sb-filter" placeholder="Filter recents…" oninput="filterRecents()">
     <div class="sb-recents" id="sb-recents"></div>
   </div>
 
@@ -676,6 +693,7 @@
   let chatMessages = [];
   let isLoading = false;
   let callPrepMode = false;
+  let currentChatId = null;
 
   const mainInput     = document.getElementById('main-input');
   const sendBtn       = document.getElementById('send-btn');
@@ -698,13 +716,9 @@
     sidebar.classList.toggle('open');
   }
   function focusSearch() {
-    if (context) {
-      mainInput.value = '/search ';
-      mainInput.focus();
-      mainInput.setSelectionRange(8, 8);
-    } else {
-      landingInput.focus();
-    }
+    if (!sidebar.classList.contains('open')) sidebar.classList.add('open');
+    const filter = document.getElementById('sb-filter');
+    if (filter) { filter.focus(); filter.select(); }
   }
   function focusChats() {
     if (context) {
@@ -723,25 +737,44 @@
       renderSidebarRecents(data.chats || []);
     } catch { /* fail silently */ }
   }
-  async function saveRecentChat(firm) {
+  async function createRecentChat(firm, ctx) {
+    try {
+      const res = await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', firm, context: ctx }),
+      });
+      const data = await res.json();
+      return data.id || null;
+    } catch { return null; }
+  }
+  async function appendTurn(turn) {
+    if (!currentChatId) return;
     try {
       await fetch('/api/history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firm }),
+        body: JSON.stringify({ action: 'append', id: currentChatId, turn }),
       });
     } catch { /* fail silently */ }
   }
   function renderSidebarRecents(chats) {
     const container = document.getElementById('sb-recents');
     container.innerHTML = '';
-    chats.forEach(({ firm }) => {
+    chats.forEach(({ id, firm }) => {
       const btn = document.createElement('button');
       btn.className = 'sb-recent-item';
       btn.textContent = firm;
       btn.title = firm;
-      btn.onclick = () => { if (!isLoading) doLookup(firm); };
+      btn.dataset.firm = (firm || '').toLowerCase();
+      btn.onclick = () => { if (!isLoading) { if (id) loadChat(id); else doLookup(firm); } };
       container.appendChild(btn);
+    });
+  }
+  function filterRecents() {
+    const q = document.getElementById('sb-filter').value.toLowerCase().trim();
+    document.querySelectorAll('.sb-recent-item').forEach(btn => {
+      btn.style.display = (!q || btn.dataset.firm?.includes(q)) ? '' : 'none';
     });
   }
 
@@ -835,6 +868,7 @@
 
   async function doLookup(firm) {
     isLoading = true;
+    currentChatId = null;
     sendBtn.disabled = true;
     landingSend.disabled = true;
     callPrepBtnEl.disabled = true;
@@ -895,11 +929,9 @@
 
       scrollBottom();
 
-      // Save to server-side history and refresh sidebar
-      await saveRecentChat(firm);
-      loadRecentChats();
-
       context = { firm: data.firm, status: data.status, summary: data.summary, emails: data.emails, calendarEvents: data.calendarEvents, people: data.people || [] };
+      currentChatId = await createRecentChat(data.firm, data);
+      loadRecentChats();
       chatMessages = [];
 
       firmBadge.textContent = data.firm;
@@ -1073,6 +1105,7 @@
       const wrapper = document.createElement('div');
       wrapper.innerHTML = `<div class="search-label">⌕ Web search</div>` + marked.parse(data.answer || 'No results found.');
       addMsg('assistant', wrapper);
+      appendTurn({ type: 'search', user: query, assistant: data.answer || '' });
     } catch (err) {
       searchRow.remove();
       addMsg('assistant', `Search error: ${err.message}`);
@@ -1108,6 +1141,7 @@
       const answer = data.answer || 'No response.';
       chatMessages.push({ role: 'assistant', content: answer });
       addMsg('assistant', answer);
+      appendTurn({ type: 'chat', user: text, assistant: answer });
     } catch (err) {
       dotsRow.remove();
       addMsg('assistant', `Error: ${err.message}`);
@@ -1118,11 +1152,72 @@
     mainInput.focus();
   }
 
+  // ── Load saved chat ──────────────────────────────────────
+  async function loadChat(id) {
+    if (isLoading) return;
+    try {
+      const res = await fetch(`/api/history?id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      if (!data.chat) return;
+      const chat = data.chat;
+
+      // Reset to clean state
+      context = null;
+      chatMessages = [];
+      callPrepMode = false;
+      currentChatId = chat.id;
+      msgArea.innerHTML = '';
+      msgArea.style.display = 'none';
+      emptyEl.style.display = 'flex';
+      inputBar.style.display = 'none';
+      firmBadge.style.display = 'none';
+      landingInput.value = '';
+      landingInput.style.height = 'auto';
+
+      const ctx = chat.context || {};
+      context = {
+        firm: ctx.firm || chat.firm,
+        status: ctx.status,
+        summary: ctx.summary,
+        emails: ctx.emails || [],
+        calendarEvents: ctx.calendarEvents || [],
+        people: ctx.people || [],
+      };
+
+      addMsg('user', ctx.mode === 'callprep' ? `Call prep: ${chat.firm}` : chat.firm);
+      renderResultCard({ ...ctx, firm: chat.firm });
+      addMsg('assistant', 'What else would you like to know?');
+
+      for (const turn of (chat.turns || [])) {
+        if (turn.type === 'chat') {
+          addMsg('user', turn.user);
+          addMsg('assistant', turn.assistant);
+          chatMessages.push({ role: 'user', content: turn.user });
+          chatMessages.push({ role: 'assistant', content: turn.assistant });
+        } else if (turn.type === 'search') {
+          addMsg('user', `/search ${turn.user}`);
+          const wrapper = document.createElement('div');
+          wrapper.innerHTML = `<div class="search-label">⌕ Web search</div>` + marked.parse(turn.assistant || '');
+          addMsg('assistant', wrapper);
+        }
+      }
+
+      firmBadge.textContent = chat.firm;
+      firmBadge.style.display = 'block';
+      mainInput.placeholder = `Ask anything, or /search [name] to look someone up…`;
+      scrollBottom();
+      mainInput.focus();
+    } catch (err) {
+      console.error('loadChat error:', err);
+    }
+  }
+
   // ── Reset ────────────────────────────────────────────────
   function newSearch() {
     context = null;
     chatMessages = [];
     callPrepMode = false;
+    currentChatId = null;
     msgArea.innerHTML = '';
     msgArea.style.display = 'none';
     emptyEl.style.display = 'flex';

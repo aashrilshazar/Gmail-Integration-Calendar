@@ -196,8 +196,22 @@ async function handleLookup(req, res) {
 app.post("/lookup", handleLookup);
 app.post("/api/lookup", handleLookup);
 
+const CHAT_TTL = 60 * 60 * 24 * 7; // 7 days
+
 app.get("/api/history", async (req, res) => {
-  if (!redis) return res.json({ chats: [] });
+  if (!redis) return res.json(req.query?.id ? { chat: null } : { chats: [] });
+
+  if (req.query?.id) {
+    try {
+      const raw = await redis.get(`keye:chat:${req.query.id}`);
+      const chat = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
+      return res.json({ chat });
+    } catch (err) {
+      console.error("History GET chat:", err.message);
+      return res.json({ chat: null });
+    }
+  }
+
   try {
     const raw = await redis.lrange("keye:recent_chats", 0, 19);
     const chats = raw.map(c => (typeof c === "string" ? JSON.parse(c) : c));
@@ -207,14 +221,43 @@ app.get("/api/history", async (req, res) => {
 });
 
 app.post("/api/history", async (req, res) => {
-  const { firm } = req.body || {};
-  if (!firm) return res.status(400).json({ error: "Provide firm" });
-  if (!redis) return res.json({ ok: true });
-  try {
-    await redis.lpush("keye:recent_chats", JSON.stringify({ firm, ts: Date.now() }));
-    await redis.ltrim("keye:recent_chats", 0, 19);
-    res.json({ ok: true });
-  } catch { res.json({ ok: true }); }
+  const { action, firm, context, id, turn } = req.body || {};
+  if (!redis) return res.json({ ok: true, id: Date.now().toString() });
+
+  if (action === "create") {
+    if (!firm) return res.status(400).json({ error: "Provide firm" });
+    const newId = Date.now().toString();
+    const trimmedContext = context
+      ? { ...context, emails: (context.emails || []).slice(0, 15) }
+      : null;
+    const chatData = { id: newId, firm, ts: Date.now(), context: trimmedContext, turns: [] };
+    try {
+      await redis.set(`keye:chat:${newId}`, JSON.stringify(chatData), { ex: CHAT_TTL });
+      await redis.lpush("keye:recent_chats", JSON.stringify({ id: newId, firm, ts: Date.now() }));
+      await redis.ltrim("keye:recent_chats", 0, 19);
+      return res.json({ ok: true, id: newId });
+    } catch (err) {
+      console.error("History create:", err.message);
+      return res.json({ ok: true, id: newId });
+    }
+  }
+
+  if (action === "append") {
+    if (!id || !turn) return res.status(400).json({ error: "Provide id and turn" });
+    try {
+      const raw = await redis.get(`keye:chat:${id}`);
+      const chat = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : null;
+      if (!chat) return res.json({ ok: true });
+      chat.turns = [...(chat.turns || []), turn];
+      await redis.set(`keye:chat:${id}`, JSON.stringify(chat), { ex: CHAT_TTL });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("History append:", err.message);
+      return res.json({ ok: true });
+    }
+  }
+
+  return res.status(400).json({ error: "Invalid action" });
 });
 
 app.post("/api/search", async (req, res) => {
