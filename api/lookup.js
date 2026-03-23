@@ -218,7 +218,7 @@ Rules:
 - Oldest event first, most recent event last.
 - Each bullet should logically follow from the previous, building a continuous narrative arc.
 - Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people.
-- Each bullet MUST begin with the exact date in "Month D, YYYY: " format immediately followed by a colon and space (e.g. "- January 31, 2026: Rohan reached out..."). Never start with "On", "In", or any other word before the date.
+- Each bullet MUST begin with the exact date in "Month D, YYYY: " format — a single calendar date, never a range (e.g. "- January 31, 2026: Rohan reached out..."). If multiple emails span several days, use the date of the first one. Never write "January 21–22" or "Feb 10–13" or any range. Never start with "On", "In", or any other word before the date.
 - Group related outreach into one bullet rather than listing each email separately.
 - The final bullet must reflect the current status: the most recent interaction and any upcoming meetings.
 - Never contradict a previous bullet.

@@ -37,7 +37,7 @@ ${context.summary || "None."}`;
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 400,
+        max_tokens: 1000,
         system,
         messages,
       }),

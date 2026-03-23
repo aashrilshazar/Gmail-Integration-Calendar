@@ -820,7 +820,7 @@
       if (data.summary) {
         data.summary.split('\n').filter(l => l.trim()).forEach(line => {
           const text = line.replace(/^-\s*/, '');
-          const match = text.match(/^([A-Z][a-z]+ \d+, \d{4}:)\s*([\s\S]*)/);
+          const match = text.match(/^([A-Z][a-z]+ \d+(?:[–\-]\d+)?, \d{4}:)\s*([\s\S]*)/);
           const item = document.createElement('div');
           item.className = 'timeline-item';
           if (match) {
