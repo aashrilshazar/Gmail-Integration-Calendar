@@ -10,20 +10,12 @@ export default async function handler(req, res) {
 
   try {
     // 1. Search Calendar first (so we can extract attendee domains for Gmail search)
-    const now = new Date();
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    const threeMonthsAhead = new Date(now);
-    threeMonthsAhead.setMonth(threeMonthsAhead.getMonth() + 3);
-
     const calendarResults = await Promise.all(
       ACCOUNTS.map(async (email) => {
         try {
           const cal = getCalendarClient(email);
           const response = await cal.events.list({
             calendarId: "primary",
-            timeMin: sixMonthsAgo.toISOString(),
-            timeMax: threeMonthsAhead.toISOString(),
             q: firm,
             singleEvents: true,
             orderBy: "startTime",
@@ -174,7 +166,7 @@ async function generateSummary(firm, emails, calendarEvents) {
     `[${e.start}] ${e.title} — Attendees: ${e.attendees.map(a => a.name || a.email).join(", ")}`
   ).join("\n");
 
-  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Summarize the relationship and deal status with "${firm}" based on the context below. Note: "${firm}" may be a partial name — match liberally.
+  const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Write a relationship summary for "${firm}" that reads as a clear, cohesive narrative from top to bottom. Note: "${firm}" may be a partial name — match liberally.
 
 EMAILS (sorted newest to oldest):
 ${emailContext || "None."}
@@ -182,12 +174,17 @@ ${emailContext || "None."}
 CALENDAR EVENTS:
 ${calendarContext || "None."}
 
-Respond with exactly 3 to 5 bullet points. Start each line with "- " (dash space). Do not use markdown formatting. Each bullet must be a single factual statement.
+Write 3 to 5 bullet points in strict chronological order — oldest first, most recent last. Together they should tell the complete story of Keye's relationship with this firm: how contact was first made, how it developed, and where things stand today.
 
-Bullet point order:
-1. First bullet: the latest update or action item.
-2. Second bullet: how the most recent calendar meeting was scheduled — who from Keye reached out to who at the firm, on what date, and the context/subject of that outreach (e.g. "Dani Kobrick reached out to Pieter Cilliers as part of the INSEAD Alumni outreach on Feb 25, 2026"). Look at the earliest email thread that led to this meeting being booked.
-3. Remaining bullets: other key factual updates in reverse chronological order.
+Rules:
+- Start each line with "- " (dash space). No other markdown.
+- Oldest event first, most recent event last.
+- Each bullet should logically follow from the previous, building a continuous narrative arc.
+- Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people, omit exhaustive lists.
+- Always use exact dates in "Month D, YYYY" format (e.g. "January 31, 2026"). Never use vague references like "January 2026", "Late January", or "early February".
+- Group related outreach into one bullet rather than listing each email separately.
+- The final bullet must reflect the current status: the most recent interaction and any upcoming meetings.
+- Never contradict a previous bullet. If a meeting predates the email outreach, acknowledge that clearly.
 
 If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${firm}."`;
 
@@ -200,7 +197,7 @@ If there is truly no relevant context, respond with a single bullet: "- No prior
     },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 300,
+      max_tokens: 500,
       messages: [{ role: "user", content: prompt }],
     }),
   });
