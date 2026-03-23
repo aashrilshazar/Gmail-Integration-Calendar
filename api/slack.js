@@ -56,6 +56,7 @@ async function doLookup(firm, responseUrl) {
 function formatSlackMessage(firm, { summary, calendarEvents }) {
   let msg = `*${firm}*\n\n`;
 
+  msg += "*Email History*\n";
   if (summary) {
     msg += summary + "\n";
   } else {
@@ -63,7 +64,7 @@ function formatSlackMessage(firm, { summary, calendarEvents }) {
   }
 
   if (calendarEvents && calendarEvents.length > 0) {
-    msg += "\n*Upcoming Meetings:*\n";
+    msg += "\n*Meeting History*\n";
     calendarEvents.slice(0, 5).forEach(e => {
       const date = new Date(e.start).toLocaleDateString("en-US", {
         weekday: "short", month: "short", day: "numeric", year: "numeric",
@@ -227,7 +228,7 @@ Rules:
 - Oldest event first, most recent event last.
 - Each bullet should logically follow from the previous, building a continuous narrative arc.
 - Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people, omit exhaustive lists.
-- Include dates and the key "what happened" — who reached out, what angle, what came of it.
+- Always use exact dates in "Month D, YYYY" format (e.g. "January 31, 2026"). Never use vague references like "January 2026", "Late January", or "early February".
 - Group related outreach into one bullet rather than listing each email separately.
 - The final bullet must reflect the current status: the most recent interaction and any upcoming meetings.
 - Never contradict a previous bullet. If a meeting predates the email outreach, acknowledge that clearly.
