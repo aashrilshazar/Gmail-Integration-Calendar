@@ -226,7 +226,8 @@ Rules:
 - Start each line with "- " (dash space). No other markdown.
 - Oldest event first, most recent event last.
 - Each bullet should logically follow from the previous, building a continuous narrative arc.
-- Include specific names, dates, and context (e.g. the angle used for outreach, who initiated, what was discussed).
+- Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people, omit exhaustive lists.
+- Include dates and the key "what happened" — who reached out, what angle, what came of it.
 - Group related outreach into one bullet rather than listing each email separately.
 - The final bullet must reflect the current status: the most recent interaction and any upcoming meetings.
 - Never contradict a previous bullet. If a meeting predates the email outreach, acknowledge that clearly.
