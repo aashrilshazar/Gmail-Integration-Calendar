@@ -228,14 +228,36 @@
     }
 
     /* Markdown in assistant bubbles */
-    .msg.assistant .msg-bubble p           { margin-bottom: 10px; }
+    .msg.assistant .msg-bubble p            { margin-bottom: 10px; }
     .msg.assistant .msg-bubble p:last-child { margin-bottom: 0; }
     .msg.assistant .msg-bubble ul,
-    .msg.assistant .msg-bubble ol          { padding-left: 18px; margin-bottom: 10px; }
-    .msg.assistant .msg-bubble li          { margin-bottom: 5px; }
-    .msg.assistant .msg-bubble strong      { color: var(--accent); }
-    .msg.assistant .msg-bubble em          { color: var(--text-2); }
-    .msg.assistant .msg-bubble h2          { font-size: 13px; font-weight: 700; color: var(--accent); margin: 14px 0 6px; letter-spacing: 0.01em; }
+    .msg.assistant .msg-bubble ol           { padding-left: 18px; margin-bottom: 10px; }
+    .msg.assistant .msg-bubble li           { margin-bottom: 5px; }
+    .msg.assistant .msg-bubble strong       { color: var(--accent); }
+    .msg.assistant .msg-bubble em           { color: var(--text-2); }
+    .msg.assistant .msg-bubble h1,
+    .msg.assistant .msg-bubble h2,
+    .msg.assistant .msg-bubble h3           { color: var(--accent); margin: 14px 0 6px; letter-spacing: 0.01em; }
+    .msg.assistant .msg-bubble h1           { font-size: 15px; }
+    .msg.assistant .msg-bubble h2           { font-size: 13px; }
+    .msg.assistant .msg-bubble h3           { font-size: 12px; font-weight: 600; }
+    .msg.assistant .msg-bubble hr           { border: none; border-top: 1px solid var(--border-2); margin: 12px 0; }
+    .msg.assistant .msg-bubble blockquote   { border-left: 2px solid var(--border-2); padding-left: 12px; color: var(--text-2); margin: 8px 0; }
+    .msg.assistant .msg-bubble code         { font-family: "SF Mono", "Fira Code", monospace; font-size: 12px; background: #1e1e1e; color: #c8d3f5; padding: 1px 5px; border-radius: 4px; }
+    .msg.assistant .msg-bubble pre          { background: #1a1a1a; border: 1px solid var(--border-2); border-radius: 8px; padding: 12px 14px; margin: 10px 0; overflow-x: auto; }
+    .msg.assistant .msg-bubble pre code     { background: none; padding: 0; color: #c8d3f5; font-size: 12px; }
+
+    /* Markdown tables */
+    .msg.assistant .msg-bubble table        { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+    .msg.assistant .msg-bubble th           { text-align: left; padding: 7px 12px; font-weight: 600; color: var(--accent); background: #1a1a1a; border: 1px solid var(--border-2); }
+    .msg.assistant .msg-bubble td           { padding: 7px 12px; color: var(--text); border: 1px solid var(--border-2); vertical-align: top; }
+    .msg.assistant .msg-bubble tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    /* Same table styles inside result-section (call prep markdown) */
+    .result-section table  { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+    .result-section th     { text-align: left; padding: 7px 12px; font-weight: 600; color: var(--accent); background: #1a1a1a; border: 1px solid var(--border-2); }
+    .result-section td     { padding: 7px 12px; color: var(--text); border: 1px solid var(--border-2); vertical-align: top; }
+    .result-section tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
 
     /* ── Result card ── */
     .result-card {
@@ -534,7 +556,7 @@
 </div>
 
 <script>
-  marked.setOptions({ breaks: true });
+  marked.setOptions({ breaks: true, gfm: true });
 
   let context = null;
   let chatMessages = [];
