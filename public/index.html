@@ -792,7 +792,7 @@
       scrollBottom();
 
       saveSearch(firm);
-      context = { firm: data.firm, summary: data.summary, emails: data.emails, calendarEvents: data.calendarEvents };
+      context = { firm: data.firm, status: data.status, summary: data.summary, emails: data.emails, calendarEvents: data.calendarEvents, people: data.people || [] };
       chatMessages = [];
 
       firmBadge.textContent = data.firm;
@@ -961,7 +961,12 @@
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, firm: context?.firm || null }),
+        body: JSON.stringify({
+          query,
+          firm: context?.firm || null,
+          summary: context?.summary || null,
+          people: context?.people || [],
+        }),
       });
       const data = await res.json();
       searchRow.remove();

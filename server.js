@@ -197,10 +197,12 @@ app.post("/lookup", handleLookup);
 app.post("/api/lookup", handleLookup);
 
 app.post("/api/search", async (req, res) => {
-  const { query, firm } = req.body || {};
+  const { query, firm, summary, people } = req.body || {};
   if (!query) return res.status(400).json({ error: "Provide a query" });
 
-  const system = `You are a research assistant for Keye, a PE-focused AI due diligence platform. Answer questions about people and firms using web search. When researching a person, check their firm's team page, LinkedIn, and recent news. Be concise and cite sources.${firm ? `\n\nFirm context: ${firm}.` : ""}`;
+  const knownContacts = (people || []).slice(0, 40).join(", ");
+  const contextBlock = [firm ? `Firm: ${firm}` : null, summary ? `Relationship summary: ${summary}` : null, knownContacts ? `Known contacts: ${knownContacts}` : null].filter(Boolean).join("\n");
+  const system = `You are a web research assistant for Keye. Look up public info — titles, roles, locations, prior experience — using web search.\n\n${contextBlock ? `CONTEXT (use to search accurately, do not repeat in answer):\n${contextBlock}\n\n` : ""}Search the firm's team page, LinkedIn, and news. Be concise and cite sources.`;
   const messages = [{ role: "user", content: query }];
 
   try {

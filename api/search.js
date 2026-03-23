@@ -1,15 +1,26 @@
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
-  const { query, firm } = req.body || {};
+  const { query, firm, summary, people } = req.body || {};
   if (!query) return res.status(400).json({ error: "Provide a query" });
 
-  const system = `You are a research assistant for Keye, a PE-focused AI due diligence platform. Answer questions about people and firms using web search. When researching a person:
-1. Search their firm's team/about page first
-2. Search LinkedIn for title, team, location, and prior experience
-3. Check recent news or press for additional context
+  const knownContacts = (people || []).slice(0, 40).join(", ");
+  const contextBlock = [
+    firm ? `Firm: ${firm}` : null,
+    summary ? `Keye's relationship summary: ${summary}` : null,
+    knownContacts ? `Known contacts from emails/calendar: ${knownContacts}` : null,
+  ].filter(Boolean).join("\n");
 
-Be concise and factual. Always cite your sources with the URL or site name. If you cannot find reliable information, say so clearly.${firm ? `\n\nCurrent firm context: ${firm}.` : ""}`;
+  const system = `You are a web research assistant for Keye, a PE-focused AI due diligence platform. Your job is to look up public information — titles, roles, teams, locations, prior experience, and background — using web search.
+
+${contextBlock ? `CONTEXT FROM KEYE'S INTERNAL DATA:\n${contextBlock}\n\nUse this to inform your searches (e.g. search for the right person at the right firm). Do not describe or repeat this internal context in your answer — just use it to search more accurately.` : ""}
+
+When researching a person:
+1. Search the firm's website team/about page
+2. Search LinkedIn for current role, team, location, and prior experience
+3. Check recent news or press if relevant
+
+Be concise and factual. Cite your sources (site name or URL). If you cannot find reliable public information, say so plainly.`;
 
   const messages = [{ role: "user", content: query }];
 
