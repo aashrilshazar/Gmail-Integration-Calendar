@@ -79,20 +79,12 @@ function formatSlackMessage(firm, { summary, calendarEvents }) {
 
 async function lookup(firm) {
   // 1. Search Calendar first
-  const now = new Date();
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  const threeMonthsAhead = new Date(now);
-  threeMonthsAhead.setMonth(threeMonthsAhead.getMonth() + 3);
-
   const calendarResults = await Promise.all(
     ACCOUNTS.map(async (email) => {
       try {
         const cal = getCalendarClient(email);
         const response = await cal.events.list({
           calendarId: "primary",
-          timeMin: sixMonthsAgo.toISOString(),
-          timeMax: threeMonthsAhead.toISOString(),
           q: firm,
           singleEvents: true,
           orderBy: "startTime",
