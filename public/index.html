@@ -759,22 +759,12 @@
   function renderSidebarRecents(chats) {
     const container = document.getElementById('sb-recents');
     container.innerHTML = '';
-    chats.forEach(({ id, firm, ts }) => {
+    chats.forEach(({ id, firm }) => {
       const btn = document.createElement('button');
       btn.className = 'sb-recent-item';
+      btn.textContent = firm;
       btn.title = firm;
       btn.dataset.firm = (firm || '').toLowerCase();
-      btn.style.cssText = 'display:flex;align-items:center;gap:7px;';
-      const dotColor = activityDotColor(ts);
-      if (dotColor) {
-        const dot = document.createElement('span');
-        dot.style.cssText = `width:5px;height:5px;border-radius:50%;background:${dotColor};flex-shrink:0;`;
-        btn.appendChild(dot);
-      }
-      const label = document.createElement('span');
-      label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-      label.textContent = firm;
-      btn.appendChild(label);
       btn.onclick = () => { if (!isLoading) { if (id) loadChat(id); else doLookup(firm); } };
       container.appendChild(btn);
     });
@@ -800,33 +790,6 @@
     return null;
   }
 
-  function recencyColor(dateStr) {
-    if (!dateStr) return null;
-    const parsed = new Date(dateStr.replace(/:$/, ''));
-    if (isNaN(parsed.getTime())) return null;
-    const days = (Date.now() - parsed.getTime()) / 86400000;
-    if (days < 30)  return C_GREEN;
-    if (days < 180) return C_ORANGE;
-    return C_RED;
-  }
-
-  function meetingTimeColor(startStr) {
-    if (!startStr) return null;
-    const d = new Date(startStr);
-    if (isNaN(d.getTime())) return null;
-    const days = (d.getTime() - Date.now()) / 86400000;
-    if (days > 0)   return C_GREEN;   // upcoming
-    if (days > -30) return C_ORANGE;  // within last 30 days
-    return null;
-  }
-
-  function activityDotColor(ts) {
-    if (!ts) return null;
-    const days = (Date.now() - ts) / 86400000;
-    if (days < 1) return C_GREEN;
-    if (days < 7) return C_ORANGE;
-    return null;
-  }
 
   // ── Attendee name parsing ─────────────────────────────────
   function parseName(raw) {
@@ -1062,10 +1025,7 @@
           const item = document.createElement('div');
           item.className = 'timeline-item';
           if (match) {
-            const color = recencyColor(match[1]);
-            const dateStyle = color ? ` style="color:${color}"` : '';
-            const dotStyle  = color ? ` style="background:${color}"` : '';
-            item.innerHTML = `<span class="tl-dot"${dotStyle}></span><span class="tl-date"${dateStyle}>${match[1]}</span><span class="tl-text">${match[2]}</span>`;
+            item.innerHTML = `<span class="tl-dot"></span><span class="tl-date">${match[1]}</span><span class="tl-text">${match[2]}</span>`;
           } else {
             item.innerHTML = `<span class="tl-dot"></span><span class="tl-text">${text}</span>`;
           }
@@ -1082,12 +1042,10 @@
       card.appendChild(emailSec);
 
       const meetCount = data.calendarEvents?.length || 0;
-      const hasUpcoming = (data.calendarEvents || []).some(e => new Date(e.start) > new Date());
       const collHeader = document.createElement('div');
       collHeader.className = 'collapsible-header';
       collHeader.setAttribute('data-open', 'false');
-      const upcomingBadge = hasUpcoming ? `<span style="width:6px;height:6px;border-radius:50%;background:${C_GREEN};flex-shrink:0;display:inline-block;margin-left:6px;vertical-align:middle;" title="Upcoming meeting"></span>` : '';
-      collHeader.innerHTML = `<span class="section-label" style="margin-bottom:0;display:flex;align-items:center">Meeting History (${meetCount})${upcomingBadge}</span><span style="display:flex;align-items:center;gap:6px"><span class="collapsible-hint">expand</span><span class="collapsible-chevron">▸</span></span>`;
+      collHeader.innerHTML = `<span class="section-label" style="margin-bottom:0">Meeting History (${meetCount})</span><span style="display:flex;align-items:center;gap:6px"><span class="collapsible-hint">expand</span><span class="collapsible-chevron">▸</span></span>`;
 
       const collBody = document.createElement('div');
       collBody.className = 'collapsible-body';
@@ -1113,9 +1071,8 @@
             const display = parseName(raw);
             return `<span title="${a.email || ''}">${display}</span>`;
           }).join(', ');
-          const mColor = meetingTimeColor(e.start);
           item.innerHTML = `
-            <span class="meeting-date"${mColor ? ` style="color:${mColor}"` : ''}>${date}</span>
+            <span class="meeting-date">${date}</span>
             <span class="meeting-title">${e.title}</span>
             <span class="meeting-people">${peopleHtml}</span>
           `;
