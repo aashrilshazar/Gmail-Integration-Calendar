@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "POST only" });
   }
 
-  const { firm } = req.body || {};
+  const { firm, mode } = req.body || {};
   if (!firm) return res.status(400).json({ error: "Provide a firm name" });
 
   try {
@@ -138,17 +138,40 @@ export default async function handler(req, res) {
       return false;
     });
 
-    // 5. Generate AI summary
+    // 5. Generate AI summary or call prep
     let summary = null;
+    let status = null;
     if (process.env.ANTHROPIC_API_KEY) {
       try {
-        summary = await generateSummary(firm, relevantEmails, calendarEvents);
+        if (mode === "callprep") {
+          summary = await generateCallPrep(firm, relevantEmails, calendarEvents);
+        } else {
+          const raw = await generateSummary(firm, relevantEmails, calendarEvents);
+          if (raw) {
+            const lines = raw.split("\n");
+            const statusIdx = lines.findIndex(l => l.startsWith("STATUS:"));
+            if (statusIdx !== -1) {
+              status = lines[statusIdx].replace("STATUS:", "").trim();
+              summary = lines.filter((_, i) => i !== statusIdx).join("\n").trim();
+            } else {
+              summary = raw;
+            }
+          }
+        }
       } catch (err) {
         console.error("Claude summary error:", err.message);
       }
     }
 
-    const result = { firm, summary, emails: emails.slice(0, 40), calendarEvents, people };
+    const result = {
+      firm,
+      status,
+      summary,
+      mode: mode || "standard",
+      emails: emails.slice(0, 40),
+      calendarEvents,
+      people,
+    };
     res.json(result);
   } catch (err) {
     console.error("Lookup error:", err);
@@ -187,19 +210,22 @@ ${emailContext || "None."}
 CALENDAR EVENTS:
 ${calendarContext || "None."}
 
-Write 3 to 5 bullet points in strict chronological order — oldest first, most recent last. Together they should tell the complete story of Keye's relationship with this firm: how contact was first made, how it developed, and where things stand today.
+Your response MUST follow this exact format — a STATUS line first, then 3 to 5 bullet points in strict chronological order (oldest first, most recent last). Together the bullets should tell the complete story of Keye's relationship with this firm.
 
 Rules:
-- Start each line with "- " (dash space). No other markdown.
+- First line MUST be: STATUS: [one concise phrase, e.g. "Active — last contact March 2026" or "Dormant since Q3 2025" or "No prior contact found"]
+- After the STATUS line, each bullet starts with "- " (dash space). No other markdown.
 - Oldest event first, most recent event last.
 - Each bullet should logically follow from the previous, building a continuous narrative arc.
-- Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people, omit exhaustive lists.
+- Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people.
 - Each bullet MUST begin with the exact date in "Month D, YYYY: " format immediately followed by a colon and space (e.g. "- January 31, 2026: Rohan reached out..."). Never start with "On", "In", or any other word before the date.
 - Group related outreach into one bullet rather than listing each email separately.
 - The final bullet must reflect the current status: the most recent interaction and any upcoming meetings.
-- Never contradict a previous bullet. If a meeting predates the email outreach, acknowledge that clearly.
+- Never contradict a previous bullet.
 
-If there is truly no relevant context, respond with a single bullet: "- No prior communications found for ${firm}."`;
+If there is truly no relevant context:
+STATUS: No prior communications found
+- No prior communications found for ${firm}.`;
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -218,6 +244,61 @@ If there is truly no relevant context, respond with a single bullet: "- No prior
   const data = await response.json();
   if (!data.content?.[0]?.text) {
     console.error("Claude API error (lookup):", JSON.stringify(data));
+  }
+  return data.content?.[0]?.text || null;
+}
+
+async function generateCallPrep(firm, emails, calendarEvents) {
+  const emailContext = emails.slice(0, 8).map(e =>
+    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject}\n${e.body || ""}`
+  ).join("\n\n");
+
+  const calendarContext = calendarEvents.slice(0, 5).map(e =>
+    `[${e.start}] ${e.title} — Attendees: ${e.attendees.map(a => a.name || a.email).join(", ")}`
+  ).join("\n");
+
+  const prompt = `You are a sales operations analyst at Keye preparing a call brief for a meeting with "${firm}". Use only the data provided below. Be concrete — use actual names and dates from the data. If data is missing for a section, say so in one sentence.
+
+EMAILS (sorted newest to oldest):
+${emailContext || "None."}
+
+CALENDAR EVENTS:
+${calendarContext || "None."}
+
+Write a concise call prep brief with these five sections using markdown ## headers:
+
+## Relationship Status
+One sentence: how active is this relationship and when was the last touchpoint.
+
+## Key Contacts
+Each person at ${firm} we have interacted with — name, role if known, most recent interaction.
+
+## Last Interaction
+Date, what was discussed, and the outcome or next step agreed upon.
+
+## Open Items / Blockers
+Any unresolved threads, pending asks, or blockers from prior communications. If none, say so.
+
+## Suggested Talking Points
+2–3 concrete talking points for the call based on the history above.`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 600,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  const data = await response.json();
+  if (!data.content?.[0]?.text) {
+    console.error("Claude API error (callprep):", JSON.stringify(data));
   }
   return data.content?.[0]?.text || null;
 }

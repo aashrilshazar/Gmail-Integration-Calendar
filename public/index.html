@@ -84,11 +84,102 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 20px;
       padding: 24px;
       color: var(--text-2);
     }
-    #empty-state p { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; color: #ffffff; }
+    #empty-state > p {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+    }
+
+    /* ── Recent chips ── */
+    #recent-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      max-width: 480px;
+    }
+    .recent-chip {
+      font-size: 12px;
+      color: var(--text-2);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .recent-chip:hover { color: var(--text); border-color: var(--border-2); }
+
+    /* ── Landing input area ── */
+    #landing-input-area {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #landing-textarea {
+      width: 100%;
+      font-size: 15px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+    #landing-textarea::placeholder { color: var(--text-3); }
+    #landing-textarea:focus { border-color: #333; }
+
+    .landing-btns {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    #landing-send-btn {
+      width: 38px; height: 38px;
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      border-radius: 9px;
+      color: var(--text-2);
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    #landing-send-btn:hover:not(:disabled) { color: var(--text); border-color: #3a3a3a; }
+    #landing-send-btn:disabled { opacity: 0.25; cursor: default; }
+
+    #call-prep-btn {
+      font-size: 12px;
+      color: var(--text-2);
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      padding: 0 14px;
+      height: 38px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    #call-prep-btn:hover:not(:disabled) { color: var(--text); border-color: #3a3a3a; }
+    #call-prep-btn:disabled { opacity: 0.25; cursor: default; }
 
     /* ── Messages ── */
     #messages {
@@ -111,7 +202,7 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    .msg.user  { align-items: flex-end; }
+    .msg.user      { align-items: flex-end; }
     .msg.assistant { align-items: flex-start; width: 100%; }
 
     .msg-bubble {
@@ -134,13 +225,14 @@
     }
 
     /* Markdown in assistant bubbles */
-    .msg.assistant .msg-bubble p         { margin-bottom: 10px; }
+    .msg.assistant .msg-bubble p           { margin-bottom: 10px; }
     .msg.assistant .msg-bubble p:last-child { margin-bottom: 0; }
     .msg.assistant .msg-bubble ul,
-    .msg.assistant .msg-bubble ol        { padding-left: 18px; margin-bottom: 10px; }
-    .msg.assistant .msg-bubble li        { margin-bottom: 5px; }
-    .msg.assistant .msg-bubble strong    { color: var(--accent); }
-    .msg.assistant .msg-bubble em        { color: var(--text-2); }
+    .msg.assistant .msg-bubble ol          { padding-left: 18px; margin-bottom: 10px; }
+    .msg.assistant .msg-bubble li          { margin-bottom: 5px; }
+    .msg.assistant .msg-bubble strong      { color: var(--accent); }
+    .msg.assistant .msg-bubble em          { color: var(--text-2); }
+    .msg.assistant .msg-bubble h2          { font-size: 13px; font-weight: 700; color: var(--accent); margin: 14px 0 6px; letter-spacing: 0.01em; }
 
     /* ── Result card ── */
     .result-card {
@@ -152,20 +244,51 @@
     }
 
     .result-firm {
-      padding: 16px 20px;
-      font-size: 17px;
+      padding: 14px 20px;
+      font-size: 16px;
       font-weight: 600;
       letter-spacing: -0.025em;
       color: var(--accent);
       border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
 
-    .result-section {
-      padding: 14px 20px;
+    .copy-btn {
+      font-size: 11px;
+      color: var(--text-3);
+      background: none;
+      border: 1px solid var(--border-2);
+      padding: 3px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      flex-shrink: 0;
     }
-    .result-section + .result-section {
-      border-top: 1px solid var(--border);
+    .copy-btn:hover { color: var(--text-2); border-color: #3a3a3a; }
+
+    /* ── Status bar ── */
+    .status-bar {
+      padding: 8px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-2);
     }
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text-3);
+      flex-shrink: 0;
+    }
+
+    .result-section { padding: 14px 20px; }
+    .result-section + .result-section { border-top: 1px solid var(--border); }
 
     .section-label {
       font-size: 10px;
@@ -176,36 +299,64 @@
       margin-bottom: 12px;
     }
 
-    .bullet-list {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .bullet-list li {
-      font-size: 13.5px;
-      line-height: 1.6;
-      color: var(--text);
-      padding: 8px 0 8px 14px;
+    /* ── Timeline (email history) ── */
+    .timeline {
       position: relative;
-      border-bottom: 1px solid var(--border);
+      padding-left: 20px;
     }
-    .bullet-list li:last-child { border-bottom: none; padding-bottom: 0; }
-    .bullet-list li:first-child { padding-top: 0; }
-    .bullet-list li::before {
+    .timeline::before {
       content: '';
       position: absolute;
-      left: 0; top: 15px;
-      width: 3px; height: 3px;
-      background: var(--text-3);
-      border-radius: 50%;
+      left: 5px; top: 8px; bottom: 8px;
+      width: 1px;
+      background: var(--border-2);
     }
+    .timeline-item {
+      position: relative;
+      padding: 7px 0 7px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .timeline-item:last-child  { border-bottom: none; padding-bottom: 0; }
+    .timeline-item:first-child { padding-top: 0; }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -15px; top: 13px;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--text-3);
+    }
+    .timeline-item:first-child::before,
+    .timeline-item:last-child::before  { background: var(--text-2); }
+    .tl-date { font-size: 11px; font-weight: 700; color: var(--accent); display: block; margin-bottom: 2px; }
+    .tl-text { font-size: 13px; line-height: 1.55; color: var(--text); }
+
+    /* ── Collapsible meeting section ── */
+    .collapsible-header {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .collapsible-header:hover { background: rgba(255,255,255,0.02); }
+    .collapsible-chevron {
+      font-size: 10px;
+      color: var(--text-3);
+      transition: transform 0.2s;
+    }
+    .collapsible-header[data-open="true"] .collapsible-chevron { transform: rotate(90deg); }
+    .collapsible-body { display: none; padding: 0 20px 14px; }
+    .collapsible-body.open { display: block; }
 
     .meeting-item {
       padding: 8px 0;
       border-bottom: 1px solid var(--border);
     }
-    .meeting-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .meeting-item:last-child  { border-bottom: none; padding-bottom: 0; }
     .meeting-item:first-child { padding-top: 0; }
 
     .meeting-date   { font-size: 12px; font-weight: 600; color: var(--text); display: block; margin-bottom: 2px; }
@@ -221,7 +372,6 @@
       gap: 10px;
       padding: 4px 0;
     }
-
     .think-step {
       display: flex;
       align-items: center;
@@ -234,9 +384,7 @@
       from { opacity: 0; transform: translateX(-5px); }
       to   { opacity: 1; transform: translateX(0); }
     }
-
     .think-step.active { color: var(--text-2); }
-
     .think-indicator {
       width: 5px; height: 5px;
       border-radius: 50%;
@@ -254,11 +402,7 @@
     }
 
     /* ── Chat thinking dots ── */
-    .chat-dots {
-      display: flex;
-      gap: 5px;
-      padding: 6px 0;
-    }
+    .chat-dots { display: flex; gap: 5px; padding: 6px 0; }
     .chat-dots span {
       width: 4px; height: 4px;
       background: var(--text-3);
@@ -273,7 +417,30 @@
       40%           { opacity: 0.9; }
     }
 
-    /* ── Input bar ── */
+    /* ── Suggestion chips ── */
+    .suggestion-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 720px;
+      width: 100%;
+      margin: -16px auto 0;
+      padding: 0 20px;
+    }
+    .chip {
+      font-size: 12px;
+      color: var(--text-2);
+      background: var(--surface);
+      border: 1px solid var(--border-2);
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .chip:hover { color: var(--text); border-color: #444; }
+
+    /* ── Bottom input bar (results mode only) ── */
     .input-bar {
       border-top: 1px solid var(--border);
       padding: 12px 20px;
@@ -336,13 +503,22 @@
 <div id="main">
   <div id="empty-state">
     <p>Enter a firm name below</p>
+    <div id="recent-chips"></div>
+    <div id="landing-input-area">
+      <textarea id="landing-textarea" placeholder="Firm name..."
+                rows="1" onkeydown="handleLandingKey(event)" oninput="autoResize(this)"></textarea>
+      <div class="landing-btns">
+        <button id="call-prep-btn" onclick="handleCallPrep()">Prep me for a call</button>
+        <button id="landing-send-btn" onclick="handleLandingSend()">↑</button>
+      </div>
+    </div>
   </div>
   <div id="messages"></div>
 </div>
 
-<div class="input-bar">
+<div class="input-bar" id="input-bar">
   <div class="input-inner">
-    <textarea id="main-input" placeholder="Enter a firm name..."
+    <textarea id="main-input" placeholder="Ask anything..."
               rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="send-btn" onclick="handleSend()">↑</button>
   </div>
@@ -354,18 +530,61 @@
   let context = null;
   let chatMessages = [];
   let isLoading = false;
+  let callPrepMode = false;
 
-  const input    = document.getElementById('main-input');
-  const sendBtn  = document.getElementById('send-btn');
-  const msgArea  = document.getElementById('messages');
-  const emptyEl  = document.getElementById('empty-state');
-  const firmBadge   = document.getElementById('firm-badge');
-  const newSrchBtn  = document.getElementById('new-search-btn');
+  const mainInput     = document.getElementById('main-input');
+  const sendBtn       = document.getElementById('send-btn');
+  const msgArea       = document.getElementById('messages');
+  const emptyEl       = document.getElementById('empty-state');
+  const firmBadge     = document.getElementById('firm-badge');
+  const newSrchBtn    = document.getElementById('new-search-btn');
+  const inputBar      = document.getElementById('input-bar');
+  const landingInput  = document.getElementById('landing-textarea');
+  const landingSend   = document.getElementById('landing-send-btn');
+  const callPrepBtnEl = document.getElementById('call-prep-btn');
 
-  input.focus();
+  // Bottom bar hidden until results
+  inputBar.style.display = 'none';
 
+  // Init
+  renderRecentChips();
+  landingInput.focus();
+
+  // ── localStorage helpers ──────────────────────────────────
+  function saveSearch(firm) {
+    const list = getRecentSearches().filter(s => s.firm.toLowerCase() !== firm.toLowerCase());
+    list.unshift({ firm, ts: Date.now() });
+    try { localStorage.setItem('keye_recent_searches', JSON.stringify(list.slice(0, 10))); } catch(e) {}
+  }
+  function getRecentSearches() {
+    try { return JSON.parse(localStorage.getItem('keye_recent_searches') || '[]'); } catch { return []; }
+  }
+  function renderRecentChips() {
+    const container = document.getElementById('recent-chips');
+    const searches = getRecentSearches();
+    container.innerHTML = '';
+    searches.forEach(({ firm }) => {
+      const btn = document.createElement('button');
+      btn.className = 'recent-chip';
+      btn.textContent = firm;
+      btn.onclick = () => { if (!isLoading) doLookup(firm); };
+      container.appendChild(btn);
+    });
+  }
+
+  // ── Attendee name parsing ─────────────────────────────────
+  function parseName(raw) {
+    if (!raw || !raw.includes('@')) return raw || '';
+    const user = raw.split('@')[0];
+    return user.split('.').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  }
+
+  // ── Input handlers ────────────────────────────────────────
   function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  }
+  function handleLandingKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleLandingSend(); }
   }
   function autoResize(el) {
     el.style.height = 'auto';
@@ -373,11 +592,24 @@
   }
   function handleSend() {
     if (isLoading) return;
-    const text = input.value.trim();
+    const text = mainInput.value.trim();
     if (!text) return;
-    input.value = '';
-    input.style.height = 'auto';
-    context ? doChat(text) : doLookup(text);
+    mainInput.value = '';
+    mainInput.style.height = 'auto';
+    doChat(text);
+  }
+  function handleLandingSend() {
+    if (isLoading) return;
+    const text = landingInput.value.trim();
+    if (!text) return;
+    doLookup(text);
+  }
+  function handleCallPrep() {
+    if (isLoading) return;
+    const text = landingInput.value.trim();
+    if (!text) return;
+    callPrepMode = true;
+    doLookup(text);
   }
 
   function scrollBottom() {
@@ -388,25 +620,23 @@
   function showMessages() {
     emptyEl.style.display = 'none';
     msgArea.style.display = 'flex';
+    inputBar.style.display = 'block';
   }
 
-  // Add a message row and return it
+  // ── Add message ──────────────────────────────────────────
   function addMsg(role, content) {
     showMessages();
     const row = document.createElement('div');
     row.className = `msg ${role}`;
-
     const bubble = document.createElement('div');
     bubble.className = 'msg-bubble';
-
     if (role === 'user') {
       bubble.textContent = content;
     } else if (typeof content === 'string') {
       bubble.innerHTML = marked.parse(content);
     } else {
-      bubble.appendChild(content); // DOM element
+      bubble.appendChild(content);
     }
-
     row.appendChild(bubble);
     msgArea.appendChild(row);
     scrollBottom();
@@ -425,11 +655,11 @@
   async function doLookup(firm) {
     isLoading = true;
     sendBtn.disabled = true;
-    input.placeholder = 'Looking up...';
+    landingSend.disabled = true;
+    callPrepBtnEl.disabled = true;
 
-    addMsg('user', firm);
+    addMsg('user', callPrepMode ? `Call prep: ${firm}` : firm);
 
-    // Chain of thought
     const chain = document.createElement('div');
     chain.className = 'think-chain';
     const chainRow = addMsg('assistant', chain);
@@ -454,7 +684,7 @@
       const res = await fetch('/api/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firm }),
+        body: JSON.stringify({ firm, mode: callPrepMode ? 'callprep' : 'standard' }),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
@@ -464,78 +694,165 @@
       renderResultCard(data);
       addMsg('assistant', 'What else would you like to know?');
 
+      // Suggestion chips
+      const chipsEl = document.createElement('div');
+      chipsEl.className = 'suggestion-chips';
+      ['Who are the key contacts?', 'Summarize the last meeting', 'Draft a follow-up email', 'What are the open blockers?'].forEach(label => {
+        const btn = document.createElement('button');
+        btn.className = 'chip';
+        btn.textContent = label;
+        btn.onclick = () => { chipsEl.remove(); doChat(label); };
+        chipsEl.appendChild(btn);
+      });
+      msgArea.appendChild(chipsEl);
+      scrollBottom();
+
+      saveSearch(firm);
       context = { firm: data.firm, summary: data.summary, emails: data.emails, calendarEvents: data.calendarEvents };
       chatMessages = [];
 
       firmBadge.textContent = data.firm;
       firmBadge.style.display = 'block';
       newSrchBtn.style.display = 'block';
-      input.placeholder = `Ask anything about ${data.firm}...`;
+      mainInput.placeholder = `Ask anything about ${data.firm}...`;
 
     } catch (err) {
       cancelled = true;
       chainRow.remove();
       addMsg('assistant', `Error looking up **${firm}**: ${err.message}`);
-      input.placeholder = 'Enter a firm name...';
     }
 
+    callPrepMode = false;
     isLoading = false;
     sendBtn.disabled = false;
-    input.focus();
+    landingSend.disabled = false;
+    callPrepBtnEl.disabled = false;
+    mainInput.focus();
   }
 
   function renderResultCard(data) {
     const card = document.createElement('div');
     card.className = 'result-card';
 
-    // Firm name
+    // Firm name + copy button
     const firmEl = document.createElement('div');
     firmEl.className = 'result-firm';
-    firmEl.textContent = data.firm;
+    const firmName = document.createElement('span');
+    firmName.textContent = data.mode === 'callprep' ? `${data.firm} — Call Prep` : data.firm;
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.textContent = 'Copy';
+    copyBtn.onclick = () => {
+      const items = card.querySelectorAll('.timeline-item');
+      let plainText;
+      if (items.length) {
+        plainText = [...items].map(item => {
+          const date = item.querySelector('.tl-date')?.textContent || '';
+          const text = item.querySelector('.tl-text')?.textContent || '';
+          return date ? `${date} ${text}` : text;
+        }).join('\n');
+      } else {
+        plainText = card.querySelector('.result-section')?.innerText || '';
+      }
+      navigator.clipboard.writeText(plainText.trim()).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+      });
+    };
+    firmEl.appendChild(firmName);
+    firmEl.appendChild(copyBtn);
     card.appendChild(firmEl);
 
-    // Email History
-    const emailSec = document.createElement('div');
-    emailSec.className = 'result-section';
-    emailSec.innerHTML = '<div class="section-label">Email History</div>';
-    const ul = document.createElement('ul');
-    ul.className = 'bullet-list';
-    if (data.summary) {
-      data.summary.split('\n').filter(l => l.trim()).forEach(line => {
-        const li = document.createElement('li');
-        const text = line.replace(/^-\s*/, '');
-        li.innerHTML = text.replace(/^([A-Z][a-z]+ \d+, \d{4}:)/, '<strong>$1</strong>');
-        ul.appendChild(li);
-      });
-    } else {
-      ul.innerHTML = '<li class="no-data">No email history found.</li>';
+    // Status bar
+    if (data.status) {
+      const statusBar = document.createElement('div');
+      statusBar.className = 'status-bar';
+      statusBar.innerHTML = `<span class="status-dot"></span><span>${data.status}</span>`;
+      card.appendChild(statusBar);
     }
-    emailSec.appendChild(ul);
-    card.appendChild(emailSec);
 
-    // Meeting History
-    const meetSec = document.createElement('div');
-    meetSec.className = 'result-section';
-    meetSec.innerHTML = '<div class="section-label">Meeting History</div>';
-    if (data.calendarEvents?.length) {
-      data.calendarEvents.slice(0, 10).forEach(e => {
-        const item = document.createElement('div');
-        item.className = 'meeting-item';
-        const date = new Date(e.start).toLocaleDateString('en-US', {
-          weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
-          hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
-        });
-        item.innerHTML = `
-          <span class="meeting-date">${date}</span>
-          <span class="meeting-title">${e.title}</span>
-          <span class="meeting-people">${e.attendees.map(a => a.name || a.email).join(', ')}</span>
-        `;
-        meetSec.appendChild(item);
-      });
+    if (data.mode === 'callprep') {
+      // Call prep: render as markdown
+      const section = document.createElement('div');
+      section.className = 'result-section';
+      section.innerHTML = marked.parse(data.summary || 'No call prep data available.');
+      card.appendChild(section);
     } else {
-      meetSec.innerHTML += '<p class="no-data">No meetings found.</p>';
+      // Email History — vertical timeline
+      const emailSec = document.createElement('div');
+      emailSec.className = 'result-section';
+      emailSec.innerHTML = '<div class="section-label">Email History</div>';
+
+      const timeline = document.createElement('div');
+      timeline.className = 'timeline';
+
+      if (data.summary) {
+        data.summary.split('\n').filter(l => l.trim()).forEach(line => {
+          const text = line.replace(/^-\s*/, '');
+          const match = text.match(/^([A-Z][a-z]+ \d+, \d{4}:)\s*([\s\S]*)/);
+          const item = document.createElement('div');
+          item.className = 'timeline-item';
+          if (match) {
+            item.innerHTML = `<span class="tl-date">${match[1]}</span><span class="tl-text">${match[2]}</span>`;
+          } else {
+            item.innerHTML = `<span class="tl-text">${text}</span>`;
+          }
+          timeline.appendChild(item);
+        });
+      } else {
+        const item = document.createElement('div');
+        item.className = 'timeline-item';
+        item.innerHTML = '<span class="tl-text no-data">No email history found.</span>';
+        timeline.appendChild(item);
+      }
+
+      emailSec.appendChild(timeline);
+      card.appendChild(emailSec);
+
+      // Meeting History — collapsible
+      const meetCount = data.calendarEvents?.length || 0;
+
+      const collHeader = document.createElement('div');
+      collHeader.className = 'collapsible-header';
+      collHeader.setAttribute('data-open', 'false');
+      collHeader.innerHTML = `<span class="section-label" style="margin-bottom:0">Meeting History (${meetCount})</span><span class="collapsible-chevron">▸</span>`;
+
+      const collBody = document.createElement('div');
+      collBody.className = 'collapsible-body';
+
+      collHeader.onclick = () => {
+        const open = collHeader.getAttribute('data-open') === 'true';
+        collHeader.setAttribute('data-open', String(!open));
+        collBody.classList.toggle('open', !open);
+      };
+
+      if (meetCount) {
+        data.calendarEvents.slice(0, 10).forEach(e => {
+          const item = document.createElement('div');
+          item.className = 'meeting-item';
+          const date = new Date(e.start).toLocaleDateString('en-US', {
+            weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+            hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
+          });
+          const peopleHtml = e.attendees.map(a => {
+            const raw = a.name || a.email;
+            const display = parseName(raw);
+            return `<span title="${a.email || ''}">${display}</span>`;
+          }).join(', ');
+          item.innerHTML = `
+            <span class="meeting-date">${date}</span>
+            <span class="meeting-title">${e.title}</span>
+            <span class="meeting-people">${peopleHtml}</span>
+          `;
+          collBody.appendChild(item);
+        });
+      } else {
+        collBody.innerHTML = '<p class="no-data" style="padding-top:8px">No meetings found.</p>';
+      }
+
+      card.appendChild(collHeader);
+      card.appendChild(collBody);
     }
-    card.appendChild(meetSec);
 
     addMsg('assistant', card);
   }
@@ -572,20 +889,24 @@
 
     isLoading = false;
     sendBtn.disabled = false;
-    input.focus();
+    mainInput.focus();
   }
 
   // ── Reset ────────────────────────────────────────────────
   function newSearch() {
     context = null;
     chatMessages = [];
+    callPrepMode = false;
     msgArea.innerHTML = '';
     msgArea.style.display = 'none';
     emptyEl.style.display = 'flex';
+    inputBar.style.display = 'none';
     firmBadge.style.display = 'none';
     newSrchBtn.style.display = 'none';
-    input.placeholder = 'Enter a firm name...';
-    input.focus();
+    landingInput.value = '';
+    landingInput.style.height = 'auto';
+    renderRecentChips();
+    landingInput.focus();
   }
 </script>
 </body>
