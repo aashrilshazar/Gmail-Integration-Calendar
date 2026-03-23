@@ -14,7 +14,9 @@ export default async function handler(req, res) {
   const { command, text, channel_id, response_url } = req.body || {};
   const input = (text || "").trim();
 
-  if (command === "/ask") {
+  console.log(`Slack command received: "${command}" | text: "${input}" | channel: ${channel_id}`);
+
+  if (command === "/ask" || command === "/asking") {
     if (!input) {
       return res.status(200).json({
         response_type: "ephemeral",
