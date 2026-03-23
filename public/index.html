@@ -40,11 +40,10 @@
       flex-shrink: 0;
     }
 
-    .wordmark {
-      font-size: 14px;
-      font-weight: 650;
-      letter-spacing: -0.01em;
-      color: var(--accent);
+    .logo-img {
+      height: 22px;
+      width: auto;
+      display: block;
     }
 
     #firm-badge {
@@ -89,8 +88,7 @@
       padding: 24px;
       color: var(--text-2);
     }
-    #empty-state p { font-size: 15px; font-weight: 450; letter-spacing: -0.02em; }
-    #empty-state span { font-size: 13px; color: var(--text-3); }
+    #empty-state p { font-size: 30px; font-weight: 700; letter-spacing: -0.03em; color: #ffffff; }
 
     /* ── Messages ── */
     #messages {
@@ -330,15 +328,14 @@
 <body>
 
 <header>
-  <span class="wordmark">Keye</span>
+  <img src="keye-logo.png" class="logo-img" alt="Keye">
   <span id="firm-badge"></span>
   <button id="new-search-btn" onclick="newSearch()">New search</button>
 </header>
 
 <div id="main">
   <div id="empty-state">
-    <p>Who are we talking to?</p>
-    <span>Enter a firm name below</span>
+    <p>Enter a firm name below</p>
   </div>
   <div id="messages"></div>
 </div>
@@ -465,6 +462,7 @@
       cancelled = true;
       chainRow.remove();
       renderResultCard(data);
+      addMsg('assistant', 'What else would you like to know?');
 
       context = { firm: data.firm, summary: data.summary, emails: data.emails, calendarEvents: data.calendarEvents };
       chatMessages = [];
@@ -505,7 +503,8 @@
     if (data.summary) {
       data.summary.split('\n').filter(l => l.trim()).forEach(line => {
         const li = document.createElement('li');
-        li.textContent = line.replace(/^-\s*/, '');
+        const text = line.replace(/^-\s*/, '');
+        li.innerHTML = text.replace(/^([A-Z][a-z]+ \d+, \d{4}:)/, '<strong>$1</strong>');
         ul.appendChild(li);
       });
     } else {
