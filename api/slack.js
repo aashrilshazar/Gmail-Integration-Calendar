@@ -1,66 +1,35 @@
 import { getGmailClient, getCalendarClient, ACCOUNTS } from "../lib/google.js";
 import { waitUntil } from "@vercel/functions";
-import Redis from "ioredis";
-
-const redis = process.env.REDIS_URL
-  ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true })
-  : null;
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "POST only" });
   }
 
-  const { command, text, channel_id, response_url } = req.body || {};
-  const input = (text || "").trim();
+  // Slack sends form-urlencoded: text = firm name, response_url = where to post result
+  const firm = (req.body?.text || "").trim();
+  const responseUrl = req.body?.response_url;
 
-  console.log(`Slack command received: "${command}" | text: "${input}" | channel: ${channel_id}`);
-
-  if (command === "/ask" || command === "/asking") {
-    if (!input) {
-      return res.status(200).json({
-        response_type: "ephemeral",
-        text: "Usage: `/ask who responded?`",
-      });
-    }
-    waitUntil(doAsk(input, channel_id, response_url));
-    return res.status(200).json({
-      response_type: "in_channel",
-      text: `Thinking about: _${input}_...`,
-    });
-  }
-
-  // /findme path
-  if (!input) {
+  if (!firm) {
     return res.status(200).json({
       response_type: "ephemeral",
       text: "Usage: `/findme Insight Partners`",
     });
   }
 
-  waitUntil(doLookup(input, response_url, channel_id));
+  // Keep the function alive after responding so the lookup can complete
+  waitUntil(doLookup(firm, responseUrl));
+
+  // ACK immediately so Slack doesn't timeout
   return res.status(200).json({
     response_type: "in_channel",
-    text: `Looking up *${input}*...`,
+    text: `Looking up *${firm}*...`,
   });
 }
 
-async function doLookup(firm, responseUrl, channel_id) {
+async function doLookup(firm, responseUrl) {
   try {
     const result = await lookup(firm);
-
-    if (redis && channel_id) {
-      try {
-        await redis.set(
-          `findme:${channel_id}`,
-          JSON.stringify({ firm, emails: result.emails, calendarEvents: result.calendarEvents }),
-          "EX", 4 * 60 * 60
-        );
-      } catch (err) {
-        console.error("Redis write error:", err.message);
-      }
-    }
-
     await fetch(responseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -239,79 +208,7 @@ async function lookup(firm) {
     summary = await generateSummary(firm, relevantEmails, calendarEvents);
   }
 
-  return { summary, calendarEvents, emails: relevantEmails };
-}
-
-async function doAsk(question, channel_id, responseUrl) {
-  try {
-    if (!redis) throw new Error("Redis not configured — set KV_REST_API_URL and KV_REST_API_TOKEN");
-    const raw = await redis.get(`findme:${channel_id}`);
-    const context = raw ? JSON.parse(raw) : null;
-    if (!context) {
-      await fetch(responseUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          response_type: "ephemeral",
-          text: "No recent `/findme` lookup found in this channel. Run `/findme [firm]` first.",
-        }),
-      });
-      return;
-    }
-    const answer = await answerQuestion(question, context);
-    await fetch(responseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ response_type: "in_channel", text: answer }),
-    });
-  } catch (err) {
-    console.error("Ask error:", err);
-    if (responseUrl) {
-      await fetch(responseUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ response_type: "ephemeral", text: `Error: ${err.message}` }),
-      });
-    }
-  }
-}
-
-async function answerQuestion(question, { firm, emails, calendarEvents }) {
-  const emailContext = (emails || []).slice(0, 8).map(e =>
-    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject} — ${e.snippet}`
-  ).join("\n");
-
-  const calendarContext = (calendarEvents || []).slice(0, 5).map(e =>
-    `[${e.start}] ${e.title} — Attendees: ${e.attendees.map(a => `${a.name || a.email} (${a.status})`).join(", ")}`
-  ).join("\n");
-
-  const prompt = `You are a sales operations analyst at Keye. Answer the following question about "${firm}" using only the data below. Be direct and specific — name names and dates. If the answer cannot be determined from the context, say so clearly. Do not speculate.
-
-EMAILS (newest first):
-${emailContext || "None."}
-
-CALENDAR EVENTS:
-${calendarContext || "None."}
-
-QUESTION: ${question}
-
-Answer in 1–3 sentences.`;
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 200,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  const data = await response.json();
-  return data.content?.[0]?.text || "Could not generate an answer.";
+  return { summary, calendarEvents };
 }
 
 async function generateSummary(firm, emails, calendarEvents) {
