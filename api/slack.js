@@ -1,9 +1,9 @@
 import { getGmailClient, getCalendarClient, ACCOUNTS } from "../lib/google.js";
 import { waitUntil } from "@vercel/functions";
-import { Redis } from "@upstash/redis";
+import Redis from "ioredis";
 
-const redis = process.env.KV_REST_API_URL
-  ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
+const redis = process.env.REDIS_URL
+  ? new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 1, lazyConnect: true })
   : null;
 
 export default async function handler(req, res) {
@@ -53,8 +53,8 @@ async function doLookup(firm, responseUrl, channel_id) {
       try {
         await redis.set(
           `findme:${channel_id}`,
-          { firm, emails: result.emails, calendarEvents: result.calendarEvents },
-          { ex: 4 * 60 * 60 }
+          JSON.stringify({ firm, emails: result.emails, calendarEvents: result.calendarEvents }),
+          "EX", 4 * 60 * 60
         );
       } catch (err) {
         console.error("Redis write error:", err.message);
@@ -245,7 +245,8 @@ async function lookup(firm) {
 async function doAsk(question, channel_id, responseUrl) {
   try {
     if (!redis) throw new Error("Redis not configured — set KV_REST_API_URL and KV_REST_API_TOKEN");
-    const context = await redis.get(`findme:${channel_id}`);
+    const raw = await redis.get(`findme:${channel_id}`);
+    const context = raw ? JSON.parse(raw) : null;
     if (!context) {
       await fetch(responseUrl, {
         method: "POST",
