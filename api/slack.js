@@ -71,7 +71,7 @@ function formatSlackMessage(firm, { summary, calendarEvents }) {
         hour: "numeric", minute: "2-digit", timeZone: "America/New_York",
       });
       const attendees = e.attendees.map(a => a.name || a.email).join(", ");
-      msg += `- ${e.title} | ${date} | ${attendees}\n`;
+      msg += `- ${date} | ${e.title} | ${attendees}\n`;
     });
   }
 
