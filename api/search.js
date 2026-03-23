@@ -50,32 +50,43 @@ Be concise and factual. Cite your sources (site name or URL). If you cannot find
         return res.status(500).json({ error: data.error.message });
       }
 
-      const textBlock = data.content?.find(b => b.type === "text");
+      // Log block types for auditing
+      console.log(`[search] iter=${i} stop=${data.stop_reason} blocks=${JSON.stringify((data.content || []).map(b => b.type))}`);
+
+      // Concatenate ALL text blocks — search responses interleave text/tool_use/tool_result
+      const allText = (data.content || [])
+        .filter(b => b.type === "text")
+        .map(b => b.text)
+        .join("\n\n")
+        .trim();
 
       if (data.stop_reason === "end_turn") {
-        return res.json({ answer: textBlock?.text || "No results found." });
+        return res.json({ answer: allText || "No results found." });
       }
 
       if (data.stop_reason === "tool_use") {
-        // Add assistant turn to history
         messages.push({ role: "assistant", content: data.content });
 
-        // Pass tool_result blocks back for each tool_use
         const toolUses = data.content.filter(b => b.type === "tool_use");
         if (!toolUses.length) {
-          return res.json({ answer: textBlock?.text || "No results found." });
+          return res.json({ answer: allText || "No results found." });
         }
 
-        const toolResults = toolUses.map(b => ({
-          type: "tool_result",
-          tool_use_id: b.id,
-          content: b.result ?? "",
-        }));
+        // Pass tool_result blocks — for built-in web search, results are in tool_result content blocks
+        const toolResults = toolUses.map(b => {
+          const resultBlock = data.content.find(
+            c => c.type === "tool_result" && c.tool_use_id === b.id
+          );
+          return {
+            type: "tool_result",
+            tool_use_id: b.id,
+            content: resultBlock?.content ?? "",
+          };
+        });
 
         messages.push({ role: "user", content: toolResults });
       } else {
-        // Unexpected stop reason — return whatever text we have
-        return res.json({ answer: textBlock?.text || "No results found." });
+        return res.json({ answer: allText || "No results found." });
       }
     }
 
