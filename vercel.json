@@ -7,6 +7,9 @@
     },
     "api/slack.js": {
       "maxDuration": 60
+    },
+    "api/chat.js": {
+      "maxDuration": 30
     }
   }
 }
