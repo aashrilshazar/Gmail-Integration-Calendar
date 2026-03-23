@@ -83,8 +83,7 @@ export default async function handler(req, res) {
                 const full = await gmail.users.messages.get({
                   userId: "me",
                   id: msg.id,
-                  format: "metadata",
-                  metadataHeaders: ["From", "To", "Subject", "Date"],
+                  format: "full",
                 });
                 const headers = full.data.payload?.headers || [];
                 const getHeader = (name) =>
@@ -95,7 +94,7 @@ export default async function handler(req, res) {
                   to: getHeader("To"),
                   subject: getHeader("Subject"),
                   date: getHeader("Date"),
-                  snippet: full.data.snippet || "",
+                  body: extractBody(full.data.payload).slice(0, 800),
                 };
               })
             );
@@ -157,10 +156,24 @@ export default async function handler(req, res) {
   }
 }
 
+function extractBody(payload) {
+  if (!payload) return "";
+  if (payload.mimeType === "text/plain" && payload.body?.data) {
+    return Buffer.from(payload.body.data, "base64url").toString("utf-8");
+  }
+  if (payload.parts) {
+    for (const part of payload.parts) {
+      const text = extractBody(part);
+      if (text) return text;
+    }
+  }
+  return "";
+}
+
 async function generateSummary(firm, emails, calendarEvents) {
   const emailContext = emails.slice(0, 8).map(e =>
-    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject} — ${e.snippet}`
-  ).join("\n");
+    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject}\n${e.body || ""}`
+  ).join("\n\n");
 
   const calendarContext = calendarEvents.slice(0, 5).map(e =>
     `[${e.start}] ${e.title} — Attendees: ${e.attendees.map(a => a.name || a.email).join(", ")}`
@@ -181,7 +194,7 @@ Rules:
 - Oldest event first, most recent event last.
 - Each bullet should logically follow from the previous, building a continuous narrative arc.
 - Each bullet must be 30 words or fewer. Be ruthlessly concise — cut filler, name only the most important people, omit exhaustive lists.
-- Always use exact dates in "Month D, YYYY" format (e.g. "January 31, 2026"). Never use vague references like "January 2026", "Late January", or "early February".
+- Each bullet MUST begin with the exact date in "Month D, YYYY: " format immediately followed by a colon and space (e.g. "- January 31, 2026: Rohan reached out..."). Never start with "On", "In", or any other word before the date.
 - Group related outreach into one bullet rather than listing each email separately.
 - The final bullet must reflect the current status: the most recent interaction and any upcoming meetings.
 - Never contradict a previous bullet. If a meeting predates the email outreach, acknowledge that clearly.

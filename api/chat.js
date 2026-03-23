@@ -9,8 +9,8 @@ export default async function handler(req, res) {
   }
 
   const emailContext = (context.emails || []).slice(0, 30).map(e =>
-    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject} — ${e.snippet}`
-  ).join("\n");
+    `[${e.date}] From: ${e.from} | To: ${e.to} | Subject: ${e.subject}\n${e.body || ""}`
+  ).join("\n\n");
 
   const calendarContext = (context.calendarEvents || []).map(e =>
     `[${e.start}] ${e.title} — ${e.attendees.map(a => a.name || a.email).join(", ")}`
