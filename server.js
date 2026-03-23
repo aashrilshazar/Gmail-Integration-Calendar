@@ -196,6 +196,27 @@ async function handleLookup(req, res) {
 app.post("/lookup", handleLookup);
 app.post("/api/lookup", handleLookup);
 
+app.get("/api/history", async (req, res) => {
+  if (!redis) return res.json({ chats: [] });
+  try {
+    const raw = await redis.lrange("keye:recent_chats", 0, 19);
+    const chats = raw.map(c => (typeof c === "string" ? JSON.parse(c) : c));
+    const seen = new Set();
+    res.json({ chats: chats.filter(c => { const k = c.firm?.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }) });
+  } catch { res.json({ chats: [] }); }
+});
+
+app.post("/api/history", async (req, res) => {
+  const { firm } = req.body || {};
+  if (!firm) return res.status(400).json({ error: "Provide firm" });
+  if (!redis) return res.json({ ok: true });
+  try {
+    await redis.lpush("keye:recent_chats", JSON.stringify({ firm, ts: Date.now() }));
+    await redis.ltrim("keye:recent_chats", 0, 19);
+    res.json({ ok: true });
+  } catch { res.json({ ok: true }); }
+});
+
 app.post("/api/search", async (req, res) => {
   const { query, firm, summary, people } = req.body || {};
   if (!query) return res.status(400).json({ error: "Provide a query" });

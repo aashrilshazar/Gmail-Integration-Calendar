@@ -13,6 +13,9 @@
     },
     "api/search.js": {
       "maxDuration": 60
+    },
+    "api/history.js": {
+      "maxDuration": 10
     }
   }
 }
