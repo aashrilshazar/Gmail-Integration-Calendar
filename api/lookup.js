@@ -196,12 +196,15 @@ If there is truly no relevant context, respond with a single bullet: "- No prior
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 500,
       messages: [{ role: "user", content: prompt }],
     }),
   });
 
   const data = await response.json();
+  if (!data.content?.[0]?.text) {
+    console.error("Claude API error (lookup):", JSON.stringify(data));
+  }
   return data.content?.[0]?.text || null;
 }
