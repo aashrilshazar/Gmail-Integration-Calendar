@@ -16,7 +16,15 @@ export default async function handler(req, res) {
     `[${e.start}] ${e.title} — ${e.attendees.map(a => a.name || a.email).join(", ")}`
   ).join("\n");
 
+  const now = new Date();
+  const currentDate = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const currentTime = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+
   const system = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Answer questions about Keye's relationship with "${context.firm}" using only the data below. Be direct and specific — name names and dates. If something cannot be determined from the context, say so clearly. Do not speculate.
+
+TODAY'S DATE AND TIME: ${currentDate}, ${currentTime}
+
+IMPORTANT: Use today's date to determine correct tense. Events with dates before today have already occurred (past tense). Events with dates after today are scheduled but have not happened yet (future tense). For example, "the last meeting" means the most recent meeting that has already taken place, not a future scheduled meeting. Clearly distinguish between past events and upcoming/scheduled events.
 
 EMAIL HISTORY:
 ${emailContext || "None."}

@@ -226,7 +226,14 @@ async function generateSummary(firm, emails, calendarEvents) {
     `[${e.start}] ${e.title} — Attendees: ${e.attendees.map(a => a.name || a.email).join(", ")}`
   ).join("\n");
 
+  const now = new Date();
+  const currentDate = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
   const prompt = `You are a sales operations analyst at Keye, an AI-powered due diligence platform for PE firms. Write a relationship summary for "${firm}" that reads as a clear, cohesive narrative from top to bottom. Note: "${firm}" may be a partial name — match liberally.
+
+TODAY'S DATE: ${currentDate}
+
+IMPORTANT: Use today's date to determine correct tense. Events before today have already occurred (past tense). Events after today are scheduled but have not happened yet (future tense). Clearly distinguish between past events and upcoming/scheduled events.
 
 EMAILS (sorted newest to oldest):
 ${emailContext || "None."}
