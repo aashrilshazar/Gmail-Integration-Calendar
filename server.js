@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { getGmailClient, getCalendarClient, ACCOUNTS } from "./lib/google.js";
+import { getAuthToken, isAuthenticated, requireAuth } from "./lib/auth.js";
 
 import { Redis } from "@upstash/redis";
 
@@ -193,12 +194,37 @@ async function handleLookup(req, res) {
   }
 }
 
-app.post("/lookup", handleLookup);
-app.post("/api/lookup", handleLookup);
+// ── Auth routes ──
+app.get("/api/auth", (req, res) => {
+  res.json({ authenticated: isAuthenticated(req) });
+});
+app.post("/api/auth", (req, res) => {
+  const { password } = req.body || {};
+  const expected = process.env.SITE_PASSWORD;
+  if (!expected) return res.json({ ok: true });
+  if (!password || password !== expected) return res.status(401).json({ error: "Invalid password" });
+  const token = getAuthToken();
+  const maxAge = 60 * 60 * 24 * 30;
+  res.setHeader("Set-Cookie", `keye_auth=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`);
+  res.json({ ok: true });
+});
+app.delete("/api/auth", (_req, res) => {
+  res.setHeader("Set-Cookie", "keye_auth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+  res.json({ ok: true });
+});
+
+// ── Auth middleware for protected routes ──
+function authGuard(req, res, next) {
+  if (!requireAuth(req, res)) return;
+  next();
+}
+
+app.post("/lookup", authGuard, handleLookup);
+app.post("/api/lookup", authGuard, handleLookup);
 
 const CHAT_TTL = 60 * 60 * 24 * 7; // 7 days
 
-app.get("/api/history", async (req, res) => {
+app.get("/api/history", authGuard, async (req, res) => {
   if (!redis) return res.json(req.query?.id ? { chat: null } : { chats: [] });
 
   if (req.query?.id) {
@@ -220,7 +246,7 @@ app.get("/api/history", async (req, res) => {
   } catch { res.json({ chats: [] }); }
 });
 
-app.post("/api/history", async (req, res) => {
+app.post("/api/history", authGuard, async (req, res) => {
   const { action, firm, context, id, turn } = req.body || {};
   if (!redis) return res.json({ ok: true, id: Date.now().toString() });
 
@@ -260,7 +286,7 @@ app.post("/api/history", async (req, res) => {
   return res.status(400).json({ error: "Invalid action" });
 });
 
-app.post("/api/search", async (req, res) => {
+app.post("/api/search", authGuard, async (req, res) => {
   const { query, firm, summary, people } = req.body || {};
   if (!query) return res.status(400).json({ error: "Provide a query" });
 
@@ -307,7 +333,7 @@ app.post("/api/search", async (req, res) => {
   }
 });
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", authGuard, async (req, res) => {
   const { messages, context } = req.body || {};
   if (!messages || !context) return res.status(400).json({ error: "Provide messages and context" });
 

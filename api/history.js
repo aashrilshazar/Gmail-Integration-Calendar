@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { requireAuth } from "../lib/auth.js";
 
 const redisUrl   = process.env.KV_REST_API_URL   || process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -10,6 +11,7 @@ const MAX_RECENTS = 20;
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  if (!requireAuth(req, res)) return;
 
   // GET /api/history          → recent chats list
   // GET /api/history?id=xxx   → full chat data

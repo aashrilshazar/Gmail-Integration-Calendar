@@ -1,5 +1,8 @@
+import { requireAuth } from "../lib/auth.js";
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+  if (!requireAuth(req, res)) return;
 
   const { query, firm, summary, people } = req.body || {};
   if (!query) return res.status(400).json({ error: "Provide a query" });
